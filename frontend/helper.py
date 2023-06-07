@@ -35,7 +35,7 @@ def initialize_session_state():
     if "updating_config" not in st.session_state:
         st.session_state.updating_config = None
     if "config" not in st.session_state:
-        st.session_state.config = Config()
+        st.session_state.config = Config.from_disk()
     if "loaded_kws" not in st.session_state:
         st.session_state.loaded_kws = []
 

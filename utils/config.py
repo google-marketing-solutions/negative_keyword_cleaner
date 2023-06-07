@@ -20,37 +20,28 @@ CONFIG_FILE = './app_config.yaml'
 
 @dataclass
 class Config:
-    client_id: str
-    client_secret: str
-    refresh_token: str
-    developer_token: str
-    login_customer_id: int
-    ai_api_token: str
-    use_proto_plus: bool
+    # OAuth credentials
+    client_id: str = ''
+    client_secret: str = ''
+    refresh_token: str = ''
 
-    def __init__(self):
-        self.file_path = CONFIG_FILE
-        config = self.load_config_from_file()
-        if config is None:
-            config = {}
+    # Google Ads API
+    developer_token: str = ''
+    login_customer_id: str = ''
+    use_proto_plus: bool = True
 
-        self.client_id = config.get('client_id', '')
-        self.client_secret = config.get('client_secret', '')
-        self.refresh_token = config.get('refresh_token', '')
-        self.developer_token = config.get('developer_token', '')
-        self.login_customer_id = config.get('login_customer_id', '')
-        self.ai_api_token = config.get('ai_api_token', '')
-        self.use_proto_plus = True
+    # LLM platform API keys
+    openai_api_key: str = ''
+    google_api_key: str = ''
 
-
-    def load_config_from_file(self):
-        with open(self.file_path, 'r') as f:
+    @classmethod
+    def from_disk(cls):
+        with open(CONFIG_FILE, 'r') as f:
             config = yaml.load(f, Loader=yaml.SafeLoader)
-        return config
+        return cls(**config)
 
-
-    def save_to_file(self):
+    def save_to_disk(self):
         config = asdict(self)
-        with open(self.file_path, 'w') as f:
+        with open(CONFIG_FILE, 'w') as f:
             yaml.dump(config, f)
-        print(f"Configurations updated in {self.file_path}")
+        print(f"Configurations updated in {CONFIG_FILE}")

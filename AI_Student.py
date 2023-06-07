@@ -15,12 +15,13 @@
 import streamlit as st
 
 import frontend.helper as st_helper
-import frontend.settings_ui as settings_ui
-import frontend.ai_student_prompt_ui as ai_student_prompt_ui
+from frontend import settings_ui
+from frontend import main_ui
 
 # The Page UI starts here
 st.set_page_config(
     page_title="AI Student",
+    page_icon="🙇‍♂️",
     layout="centered"
 )
 
@@ -28,8 +29,7 @@ st_helper.initialize_session_state()
 st_helper.customize_css()
 settings_ui.validate_setup()
 
-st.header("AI Student for Negative Keywords")
 if st.session_state.valid_config:
-    ai_student_prompt_ui.display_page()
+    main_ui.display_page()
 else:
     settings_ui.display_page()

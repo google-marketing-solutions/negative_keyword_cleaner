@@ -45,7 +45,7 @@ def validate_setup():
         st.session_state.valid_ads_config = True
 
     # Validate API Settings
-    if config.ai_api_token:
+    if config.openai_api_key or config.google_api_key:
         st.session_state.valid_api_config = True
 
 
@@ -69,7 +69,7 @@ def validate_setup():
 
     # Save any changes in the config file
     if config_updated:
-        config.save_to_file()
+        config.save_to_disk()
 
     st.session_state.valid_config = all(
         [st.session_state.valid_credentials,
@@ -87,7 +87,7 @@ def save_credentials(config):
     config.client_id = st.session_state.client_id
     config.client_secret = st.session_state.client_secret
     config.refresh_token = st.session_state.refresh_token
-    config.save_to_file()
+    config.save_to_disk()
     st.session_state.updating_config = False
     validate_setup()
 
@@ -96,7 +96,7 @@ def save_ads_config(config):
     config.login_customer_id = int(
         st.session_state.login_customer_id.replace('-', ''))
     config.developer_token = st.session_state.developer_token
-    config.save_to_file()
+    config.save_to_disk()
     if st.session_state.login_customer_id and st.session_state.developer_token:
         st.session_state.valid_ads_config = True
         st.session_state.updating_config = False
@@ -104,9 +104,10 @@ def save_ads_config(config):
 
 
 def save_api_config(config):
-    config.ai_api_token = st.session_state.ai_api_token
-    config.save_to_file()
-    if st.session_state.ai_api_token:
+    config.openai_api_key = st.session_state.openai_api_key
+    config.google_api_key = st.session_state.google_api_key
+    config.save_to_disk()
+    if st.session_state.openai_api_key or st.session_state.google_api_key:
         st.session_state.valid_api_config = True
         st.session_state.updating_config = False
     validate_setup()
@@ -165,8 +166,8 @@ def display_page():
     with st.expander("**Google Ads**", expanded=modify_ads_config):
         with st.form("Google Ads"):
             if all([
-                st.session_state.updating_config,
-                st.session_state.valid_ads_config]):
+                not st.session_state.updating_config,
+                not st.session_state.valid_ads_config]):
                 st.error(f"Google Ads configuration missing", icon="⚠️")
             st.text_input(
                 "MCC ID",
@@ -188,18 +189,26 @@ def display_page():
                 st.form_submit_button(
                     "Edit", on_click=update_config,args=[_CONFIG_ADS])
 
-    with st.expander("**AI API**", modify_api_config):
+    with st.expander("**Large Language Model APIs**", modify_api_config):
         with st.form("API"):
-            if not all([
-                st.session_state.updating_config,
-                st.session_state.valid_api_config]):
+            print("st.session_state.updating_config:", st.session_state.updating_config)
+            if all([
+                not st.session_state.updating_config,
+                not st.session_state.valid_api_config]):
                 st.error(f"AI API token missing", icon="⚠️")
 
             st.text_input(
-                "API Token",
-                value=st_helper.display(config.ai_api_token),
-                key="ai_api_token",
+                "Google API Key",
+                value=st_helper.display(config.google_api_key),
+                key="google_api_key",
                 disabled= not modify_api_config)
+
+            st.text_input(
+                "OpenAI API Key",
+                value=st_helper.display(config.openai_api_key),
+                key="openai_api_key",
+                disabled= not modify_api_config)
+
             if modify_api_config:
                 st.form_submit_button(
                     "Save", on_click=save_api_config, args=[config])

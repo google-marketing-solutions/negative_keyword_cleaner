@@ -1,11 +1,16 @@
-## AI Student for Negative Keywords
-### Install
-```
-python3 -m venv .venv
-. .venv/bin/activate
-python3 -m pip install -U pip
-pip3 install -r requirements.txt
-```
+# AI Student for Negative Keywords
 
-### Run the App
-streamlit run AI_Student.py
+## Run the app
+
+    # (Optional) if you have pyenv
+    pyenv update
+    pyenv install 3.11.3
+    pyenv local 3.11.3
+    
+    # Installs dependencies
+    python -m venv .venv
+    source .venv/bin/activate
+    (.venv) pip install -r requirements.txt
+
+    # Runs the streamlit server
+    (.venv) streamlit run AI_student.py

@@ -1,0 +1,40 @@
+[tool.poetry]
+name = "aistudent"
+version = "0.1.0"
+description = ""
+authors = [
+    "Pierre Dulac <dulacp@google.com>",
+    "Mariam Youssef <mariamyoussef@google.com>",
+]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+streamlit = "^1.22.0"
+tenacity = "^8.2.2"
+langchain = "^0.0.180"
+watchdog = "^3.0.0"
+openai = "^0.27.7"
+pyyaml = "^6.0"
+beautifulsoup4 = "^4.12.2"
+tiktoken = "^0.4.0"
+transformers = "^4.29.2"
+streamlit-lottie = "^0.0.3"
+streamlit-elements = "^0.1.0"
+matplotlib = "^3.7.1"
+google-auth-oauthlib = "^1.0.0"
+google-auth-httplib2 = "^0.1.0"
+alive-progress = "^3.1.4"
+
+
+[tool.poetry.group.lint.dependencies]
+isort = "^5.12.0"
+black = {version = "^23.1a1", allow-prereleases = true}
+flake8 = "^6.0.0"
+
+[tool.isort]
+profile = "black"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
