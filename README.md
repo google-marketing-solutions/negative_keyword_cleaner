@@ -13,4 +13,4 @@
     (.venv) pip install -r requirements.txt
 
     # Runs the streamlit server
-    (.venv) streamlit run AI_student.py
+    (.venv) streamlit run src/AI_student.py

@@ -329,7 +329,7 @@ def display_page():
     scoring_llm = OpenAI(
         temperature=0.1,
         max_tokens=2048,
-        openai_api_key=st.session_state.config.google_api_key or st.session_state.config.open_api_key,
+        openai_api_key=st.session_state.config.google_api_key or st.session_state.config.openai_api_key,
     )
 
   scored_keywords = st.session_state.get("scored_keywords", None)
@@ -348,7 +348,9 @@ def display_page():
       # TODO(dulacp): catch the same exception for PALM 2
       except OpenAIError as inst:
         st.error(f"Failed to run OpenAI LLM due to error: {inst}")
-      st.session_state.scored_keywords = scored_keywords
+        st.stop()
+      else:
+        st.session_state.scored_keywords = scored_keywords
 
   parsed_scored_keywords = models.parse_scoring_response(scored_keywords)
   if "batch_scored_keywords" not in st.session_state:
