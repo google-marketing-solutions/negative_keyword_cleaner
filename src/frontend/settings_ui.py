@@ -158,7 +158,9 @@ def display_page():
 
             if modify_credentials:
                 st.form_submit_button(
-                    "Save", on_click=save_credentials, args=[config])
+                    "Save",
+                    on_click=save_credentials,
+                    args=[st.session_state.config])
             else:
                 st.form_submit_button(
                     "Edit", on_click=update_config, args=[_CONFIG_CREDSENTIALS])
@@ -184,7 +186,9 @@ def display_page():
 
             if modify_ads_config:
                 st.form_submit_button(
-                    "Save", on_click=save_ads_config, args=[config])
+                    "Save",
+                    on_click=save_ads_config,
+                    args=[st.session_state.config])
             else:
                 st.form_submit_button(
                     "Edit", on_click=update_config,args=[_CONFIG_ADS])
@@ -201,17 +205,21 @@ def display_page():
                 "Google API Key",
                 value=st_helper.display(config.google_api_key),
                 key="google_api_key",
-                disabled= not modify_api_config)
+                disabled= not modify_api_config,
+                type="password")
 
             st.text_input(
                 "OpenAI API Key",
                 value=st_helper.display(config.openai_api_key),
                 key="openai_api_key",
-                disabled= not modify_api_config)
+                disabled= not modify_api_config,
+                type="password")
 
             if modify_api_config:
                 st.form_submit_button(
-                    "Save", on_click=save_api_config, args=[config])
+                    "Save",
+                    on_click=save_api_config,
+                    args=[st.session_state.config])
             else:
                 st.form_submit_button(
                     "Edit", on_click=update_config, args=[_CONFIG_AI_API])

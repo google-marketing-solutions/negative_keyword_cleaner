@@ -11,7 +11,7 @@
         "program": "${workspaceFolder}/.venv/bin/streamlit",
         "args": [
             "run",
-            "${workspaceFolder}/AI_Student.py"
+            "${workspaceFolder}/src/AI_Student.py"
         ],
         "console": "integratedTerminal"
     },

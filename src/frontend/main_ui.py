@@ -33,6 +33,8 @@ import yaml
 
 from .components.sidebar import display_sidebar_component
 from . import models
+from utils.keyword_helper import KeywordHelper
+
 
 SAMPLE_BATCH_SIZE = 20
 
@@ -88,6 +90,7 @@ def display_page():
         "HTML summary 1",
         "HTML summary 2",
         "HTML summary 3",
+        "HTML summary 4",
         "Renault sells a range of vehicles, including electric, full hybrid, and mild hybrid models, with prices ranging from €11,400 to €61,900. Customers can discover, configure, and compare two models in 3D, and select and discover models based on criteria such as electric, family, city, SUV, and 7+ seats. Renault also offers services such as long-term rental, contract Sérénité Renault, and delivery time. Additionally, they provide services such as MY Renault, service client, FAQ, access for deaf and hard of hearing, ordering attestations, configure, test drive, accessories, original museum & store, renew, mobilize share, garages and concessions.",
     ]
     llm = FakeListLLM(responses=responses)
@@ -95,7 +98,7 @@ def display_page():
     llm = OpenAI(
         temperature=0.2,
         max_tokens=1024,
-        openai_api_key=st.session_state.config.google_api_key or st.session_state.config.open_api_key,
+        openai_api_key=st.session_state.config.google_api_key or st.session_state.config.openai_api_key,
     )
 
 
@@ -164,35 +167,33 @@ def display_page():
   # Loads keywords
 
   with st.expander("2. Load negative keywords", expanded=st.session_state.get('load_keywords_open', True)):
-    sheets_url = st.text_input(
-        "Spreadsheet URL",
-        placeholder="https://docs.google.com/...",
-        value=st.secrets.get("private_gsheets_url", ""),
-        help="This spreadsheet needs to contain the negative keywords",
+    generate_keywords = st.button(
+        "Load Negative Keywords",
+        key="get_neg_kws"
+
     )
+    if generate_keywords:
+        kw_helper = KeywordHelper(st.session_state.config)
+        if not kw_helper:
+            st.error("An internal error occurred. Try again later")
+        else:
+            with st.spinner(text='Loading negative keywords... This may take a few minutes'):
+                negative_kws_report = kw_helper.get_neg_keywords()
+                if not negative_kws_report:
+                    st.warning("No negative keywords found")
+                    st.stop()
 
-    # Read in data from the Google Sheet.
-    # Uses st.cache_data to only rerun when the query changes or after 10 min.
-    @st.cache_data(ttl=600)
-    def load_data(sheets_url):
-        csv_url = sheets_url.replace("/edit#gid=", "/export?format=csv&gid=")
-        return pd.read_csv(csv_url, on_bad_lines='skip')
+            negative_kws = kw_helper.clean_and_dedup(negative_kws_report)
+            df = pd.DataFrame(list(negative_kws.keys()), columns=['negative_keywords'])
 
-    if not sheets_url:
-      st.stop()
+            df_test = pd.DataFrame()
+            df_train = df
+            st.success(f"I've loaded {len(df)} negative keywords. Teach me now!", icon="🤖")
 
-    df = load_data(sheets_url)
-    train_mask = (df['HumanRelevancy'].fillna(0) != 0)
-    df_test = df[~train_mask]
-    df_train = df[train_mask]
-    df_train = df_train.assign(relevancy=df_train['HumanRelevancy']).drop(columns=['HumanRelevancy'])
-
-    st.success(f"I've loaded {len(df_test)} negative keywords. Teach me now!", icon="🤖")
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total negative keywords", len(df))
-    col2.metric("Reviewed", len(df_train))
-    col3.metric("Not reviewed", len(df_test))
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Total negative keywords", len(df))
+            col2.metric("Reviewed", len(df_train))
+            col3.metric("Not reviewed", len(df_test))
 
 
   def reset_batch_props():
@@ -535,4 +536,3 @@ def display_page():
             mui.Typography("No more.")
           for item in keywords_to_keep:
             render_item_card(item)
-
