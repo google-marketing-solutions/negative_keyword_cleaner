@@ -36,7 +36,7 @@ from . import models
 from utils.keyword_helper import KeywordHelper
 
 
-SAMPLE_BATCH_SIZE = 20
+SAMPLE_BATCH_SIZE = 5
 
 SCHEMA_EVALUATIONS = {
     "bad keyword": models.KeywordEvaluation(
@@ -80,8 +80,8 @@ def get_neg_keywords(config):
 
 
 def display_page():
-  st.header("AI Student — for Google Ads Negative Keywords")
-  st.info("Hi, I am your AI student ready to learn from your client to clean their negative keywords. Let's dive in.", icon="🤖")
+  st.header("AI Student — for Google Ads Neg Keywords")
+  st.info("Hi, I am your AI student ready to learn from your client to clean their negative keywords. Let's dive in.", icon="🎓")
 
   display_sidebar_component()
 
@@ -91,7 +91,8 @@ def display_page():
         "HTML summary 2",
         "HTML summary 3",
         "HTML summary 4",
-        "Renault sells a range of vehicles, including electric, full hybrid, and mild hybrid models, with prices ranging from €11,400 to €61,900. Customers can discover, configure, and compare two models in 3D, and select and discover models based on criteria such as electric, family, city, SUV, and 7+ seats. Renault also offers services such as long-term rental, contract Sérénité Renault, and delivery time. Additionally, they provide services such as MY Renault, service client, FAQ, access for deaf and hard of hearing, ordering attestations, configure, test drive, accessories, original museum & store, renew, mobilize share, garages and concessions.",
+        #"Renault sells a range of vehicles, including electric, full hybrid, and mild hybrid models, with prices ranging from €11,400 to €61,900. Customers can discover, configure, and compare two models in 3D, and select and discover models based on criteria such as electric, family, city, SUV, and 7+ seats. Renault also offers services such as long-term rental, contract Sérénité Renault, and delivery time. Additionally, they provide services such as MY Renault, service client, FAQ, access for deaf and hard of hearing, ordering attestations, configure, test drive, accessories, original museum & store, renew, mobilize share, garages and concessions.",
+        "Nike is a global sportswear and lifestyle brand that sells a variety of products including shoes, apparel, and accessories, as well as services such as Nike App, Nike Run Club, Nike Training Club, SNKRS, and Factory Store. They offer exclusive collections and collaborations with top athletes and influencers, as well as guides on their products and support on order status, shipping and delivery, returns, payment methods, and promo codes. They also provide information about their company, news, careers, investors, sustainability, and legal information."
     ]
     llm = FakeListLLM(responses=responses)
   else:
@@ -109,11 +110,11 @@ def display_page():
     company_homepage_url = st.text_input(
         "Company Homepage URL",
         placeholder="https://...",
-        value="https://renault.fr" if DEBUG_SUMMARY else "",
+        value="https://nike.com" if DEBUG_SUMMARY else "",
     )
     if not company_homepage_url:
       st.info("Once I have their website url, I can directly read and understand "
-              "who is this customer", icon="🤖")
+              "who is this customer", icon="🎓")
       st.stop()
     else:
       #st.info("Thanks!")
@@ -125,7 +126,7 @@ def display_page():
         if DEBUG_SUMMARY: time.sleep(2)  # Too fast, we can slow it a little bit
         st.session_state.homepage_fetched = True
 
-    st.success("Browsing done, I've collected enough info", icon="🤖")
+    st.success("Browsing done, I've collected enough info", icon="🎓")
 
     with st.spinner("I'm now summarizing everything into an executive summary "
                     "(this will take a minute) ..."):
@@ -138,7 +139,7 @@ def display_page():
         homepage_summary = st.session_state.homepage_summary
 
     st.success("Summarizing done, feel free to correct anything that I've written "
-               "here. I'm just a student.", icon="🤖")
+               "here. I'm just a student.", icon="🎓")
 
     company_pitch = st.text_area(
         "Company Business Pitch",
@@ -154,8 +155,8 @@ def display_page():
     st.session_state.epoch_eval_pairs = []
 
 
-  st.button("Continue with this context", on_click=handle_continue_with_context)
   if not st.session_state.get('context_ready'):
+    st.button("Continue with this context", on_click=handle_continue_with_context)
     st.stop()
   elif st.session_state.get('context_open'):
     st.session_state.context_open = False
@@ -166,55 +167,115 @@ def display_page():
   ##
   # Loads keywords
 
-  with st.expander("2. Load negative keywords", expanded=st.session_state.get('load_keywords_open', True)):
-    generate_keywords = st.button(
-        "Load Negative Keywords",
-        key="get_neg_kws"
+  @st.cache_resource(show_spinner=False)
+  def load_keywords():
+    kw_helper = KeywordHelper(st.session_state.config)
+    if not kw_helper:
+        st.error("An internal error occurred. Try again later")
+        return
 
+    with st.spinner(text='Loading negative keywords... This may take a few minutes'):
+        negative_kws_report = kw_helper.get_neg_keywords()
+        if not negative_kws_report:
+            st.warning("No negative keywords found")
+            st.stop()
+    #print("negative_kws_report:", negative_kws_report)
+
+    negative_kws = kw_helper.clean_and_dedup(negative_kws_report)
+    df = pd.DataFrame(
+        [(kw.get_clean_keyword_text(), kw.campaign_name, kw.campaign_id, kw.adgroup_id) for keywords in negative_kws.values() for kw in keywords],
+        columns=['keyword', 'campaign_name', 'campaign_id', 'adgroup_id']
     )
-    if generate_keywords:
-        kw_helper = KeywordHelper(st.session_state.config)
-        if not kw_helper:
-            st.error("An internal error occurred. Try again later")
-        else:
-            with st.spinner(text='Loading negative keywords... This may take a few minutes'):
-                negative_kws_report = kw_helper.get_neg_keywords()
-                if not negative_kws_report:
-                    st.warning("No negative keywords found")
-                    st.stop()
+    return df
 
-            negative_kws = kw_helper.clean_and_dedup(negative_kws_report)
-            df = pd.DataFrame(list(negative_kws.keys()), columns=['negative_keywords'])
 
-            df_test = pd.DataFrame()
-            df_train = df
-            st.success(f"I've loaded {len(df)} negative keywords. Teach me now!", icon="🤖")
+  with st.expander("2. Load negative keywords", expanded=st.session_state.get('load_keywords_open', True)):
+    df = load_keywords()
+    # st.dataframe(df.sample(5))
+    st.success(f"I've loaded {len(df)} negative keywords from all campaigns. Filter only the relevant campaigns!", icon="🎓")
 
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Total negative keywords", len(df))
-            col2.metric("Reviewed", len(df_train))
-            col3.metric("Not reviewed", len(df_test))
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total negative keywords", len(df))
+    col2.metric("Total unique keywords", df.keyword.nunique())
+    col3.metric("Total campaigns", df.campaign_id.nunique())
+
+
+  def save_evaluations():
+    evaluations = st.session_state.evaluations
+    with open(".streamlit/evaluations.json", "w") as fp:
+      json.dump(evaluations, fp, cls=EnhancedJSONEncoder, indent=2)
+
+
+  def load_evaluations():
+    with open(".streamlit/evaluations.json", "r") as fp:
+      evaluations = json.load(fp, cls=EnhancedJSONDecoder)
+      print(f"Loaded #{len(evaluations)} evaluations")
+      st.session_state.evaluations = evaluations
+
+
+  def reset_evaluations():
+    st.session_state.evaluations = OrderedDict()
 
 
   def reset_batch_props():
-    st.session_state.batch_eval_pairs: list[models.EvaluationPair] = list()
     st.session_state.batch_scored_keywords = set()
     st.session_state.keyword_feedback_eval = None
 
 
-  def handle_sample_batch():
+  def handle_selected_campaigns():
+    print("Reset evaluations")
+    reset_evaluations()
+    reset_batch_props()
+    st.session_state.scored_keywords = None
+
+
+  with st.expander("3. Filter on campaigns", expanded=st.session_state.get('filter_campaigns_open', True)):
+    st.multiselect(
+        "Selected Campaigns",
+        df.groupby(['campaign_name'])['keyword'].count().reset_index(name='count').sort_values(["count"], ascending=False),
+        [],
+        on_change=handle_selected_campaigns,
+        key='selected_campaigns',
+    )
+
+    df_filtered = df.copy()
+    if st.session_state.get('selected_campaigns', None):
+      options = st.session_state.selected_campaigns
+      # print("Options:", options)
+      df_filtered = df_filtered.query("campaign_name in @options")
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Selected negative keywords", len(df_filtered))
+    col2.metric("Selected Unique keywords", df_filtered.keyword.nunique())
+    col3.metric("Selected campaigns", df_filtered.campaign_id.nunique())
+
+
+  def handle_continue_with_filters():
+    st.session_state.filters_ready = True
+
+
+  if not st.session_state.get('filters_ready', False):
+    st.button("Continue with these filters", on_click=handle_continue_with_filters)
+    st.stop()
+
+
+  def score_batch_evals():
     # Stores batch eval pairs.
     current_batch_eval_pairs = st.session_state.get("batch_eval_pairs", None)
     if current_batch_eval_pairs:
       epoch_eval_pairs = st.session_state.epoch_eval_pairs
       epoch_eval_pairs.append(current_batch_eval_pairs)
+      st.session_state.batch_eval_pairs: list[models.EvaluationPair] = list()
 
+
+  def handle_sample_batch():
     # Resets variables.
     st.session_state.sample_new_batch = True
     st.session_state.load_keywords_open = True
     st.session_state.scored_keywords = None
     st.session_state.random_state = models.get_random_state(force_new=True)
     reset_batch_props()
+    score_batch_evals()
 
 
   class EnhancedJSONEncoder(json.JSONEncoder):
@@ -234,19 +295,6 @@ def display_page():
       return data
 
 
-  def save_evaluations():
-    evaluations = st.session_state.evaluations
-    with open(".streamlit/evaluations.json", "w") as fp:
-      json.dump(evaluations, fp, cls=EnhancedJSONEncoder, indent=2)
-
-
-  def load_evaluations():
-    with open(".streamlit/evaluations.json", "r") as fp:
-      evaluations = json.load(fp, cls=EnhancedJSONDecoder)
-      print(f"Loaded #{len(evaluations)} evaluations")
-      st.session_state.evaluations = evaluations
-
-
   if st.session_state.get('load_keywords_open'):
     st.session_state.load_keywords_open = False
     time.sleep(0.05)
@@ -257,21 +305,21 @@ def display_page():
   # Samples and Scores the sampled batch.
 
   if "evaluations" not in st.session_state:
-    st.session_state.evaluations = OrderedDict()
+    reset_evaluations()
 
   evaluations = st.session_state.evaluations
   random_state = st.session_state.get("random_state", models.get_random_state())
   df_keywords = models.sample_batch(
-      df_test,
+      df_filtered,
       batch_size=SAMPLE_BATCH_SIZE,
       exclude_keywords=set(evaluations.keys()),
       random_state=random_state)
 
-  col1, col2 = st.columns(2)
-  with col1:
-    st.button("Save evaluations", on_click=save_evaluations)
-  with col2:
-    st.button("Load evaluations", on_click=load_evaluations)
+  # col1, col2 = st.columns(2)
+  # with col1:
+  #   st.button("Save evaluations", on_click=save_evaluations)
+  # with col2:
+  #   st.button("Load evaluations", on_click=load_evaluations)
 
   formatted_facts = models.format_scoring_fragment(st.session_state.evaluations or SCHEMA_EVALUATIONS)
   formatted_keywords = yaml.dump(df_keywords['keyword'].tolist(), allow_unicode=True)
@@ -334,7 +382,6 @@ def display_page():
     )
 
   scored_keywords = st.session_state.get("scored_keywords", None)
-
   if not scored_keywords:
     with st.spinner("Scoring this batch of keywords..."):
       llm_chain = LLMChain(prompt=prompt, llm=scoring_llm, verbose=True)
@@ -361,39 +408,11 @@ def display_page():
   scored_set = st.session_state.get("batch_scored_keywords", set())
   eval_pairs = st.session_state.get("batch_eval_pairs", list())
 
-  st.header("Teach me")
+  # st.header("Teach me")
   if not evaluations:
-    st.info("Help me improve my knowledge by correcting my following guesses. I will get better over time.", icon="🤖")
+    st.info("Help me improve my knowledge by correcting my following guesses. I will get better over time.", icon="🎓")
   else:
-    st.success(f"I've learned from {len(evaluations)} human evaluations. Keep on correcting me to improve my accuracy!", icon="🤖")
-
-  # Computes each batch evaluation accuracy.
-  epoch_eval_pairs = st.session_state.get("epoch_eval_pairs", [])
-  epoch_accurracies = []
-  for eval_pair in epoch_eval_pairs:
-    accuracy = sum(p.llm_decision == p.human_decision for p in eval_pair) / len(eval_pair)
-    epoch_accurracies.append(accuracy)
-  print("epoch_accurracies:", epoch_accurracies)
-
-  col1, col2, col3, col4 = st.columns(4)
-  with col3:
-    if epoch_accurracies:
-      if len(epoch_accurracies) > 1:
-        delta_accuracy = (epoch_accurracies[-1] - epoch_accurracies[-2]) / epoch_accurracies[-2]
-        delta_accuracy = f"{delta_accuracy:.0%}"
-      else:
-        delta_accuracy = None
-      st.metric(label="Accuracy (last batch)", value=f"{epoch_accurracies[-1]:.0%}", delta=delta_accuracy)
-  with col1:
-    st.button("Sample a new batch", on_click=handle_sample_batch)
-    st.button("Reset", on_click=reset_batch_props)
-  with col2:
-    if epoch_accurracies:
-      st.pyplot(models.sparkline(epoch_accurracies, ylim=[0, max(epoch_accurracies)*1.1]), transparent=True)
-  with col4:
-    batch_count = len(scored_set)
-    batch_size = len(parsed_scored_keywords)
-    st.progress(batch_count / batch_size, text=f"Batch completion {batch_count:d}/{batch_size:d}")
+    st.success(f"I've learned from {len(evaluations)} human evaluations. Keep on correcting me to improve my accuracy!", icon="🎓")
 
   # Splits keywords on the LLM decision, to simplify the review process
   keywords_to_remove = []
@@ -519,20 +538,76 @@ def display_page():
 
 
   # Display cards
-  with elements("cards"):
-    with mui.Grid(container=True):
-      with mui.Grid(item=True, xs=True):
-        mui.Typography(f"Candidates to remove ({len(keywords_to_remove)})", variant="h4", sx={"mb": 2})
-        with mui.Stack(spacing=2, direction="column", useFlexGap=True):
-          if not keywords_to_remove:
-            mui.Typography("No more.")
-          for item in keywords_to_remove:
-            render_item_card(item)
-      mui.Divider(orientation="vertical", flexItem=True, sx={"mx": 4})
-      with mui.Grid(item=True, xs=True):
-        mui.Typography(f"Candidates to keep ({len(keywords_to_keep)})", variant="h4", sx={"mb": 2})
-        with mui.Stack(spacing=2, direction="column", useFlexGap=True):
-          if not keywords_to_keep:
-            mui.Typography("No more.")
-          for item in keywords_to_keep:
-            render_item_card(item)
+  if keywords_to_remove or keywords_to_keep:
+    with elements("cards"):
+      with mui.Grid(container=True):
+        with mui.Grid(item=True, xs=True):
+          mui.Typography(f"Candidates to remove ({len(keywords_to_remove)})", variant="h4", sx={"mb": 2})
+          with mui.Stack(spacing=2, direction="column", useFlexGap=True):
+            if not keywords_to_remove:
+              mui.Typography("No more.")
+            for item in keywords_to_remove:
+              render_item_card(item)
+        mui.Divider(orientation="vertical", flexItem=True, sx={"mx": 4})
+        with mui.Grid(item=True, xs=True):
+          mui.Typography(f"Candidates to keep ({len(keywords_to_keep)})", variant="h4", sx={"mb": 2})
+          with mui.Stack(spacing=2, direction="column", useFlexGap=True):
+            if not keywords_to_keep:
+              mui.Typography("No more.")
+            for item in keywords_to_keep:
+              render_item_card(item)
+  else:
+    # Scores the batch if needed.
+    score_batch_evals()
+
+    # Computes each batch evaluation accuracy.
+    epoch_eval_pairs = st.session_state.get("epoch_eval_pairs", [])
+    epoch_accurracies = []
+    for eval_pair in epoch_eval_pairs:
+      accuracy = sum(p.llm_decision == p.human_decision for p in eval_pair) / len(eval_pair)
+      epoch_accurracies.append(accuracy)
+    print("epoch_accurracies:", epoch_accurracies)
+
+    col3, col4 = st.columns(2)
+    with col3:
+      if epoch_accurracies:
+        if len(epoch_accurracies) > 1:
+          delta_accuracy = (epoch_accurracies[-1] - epoch_accurracies[-2]) / epoch_accurracies[-2]
+          delta_accuracy = f"{delta_accuracy:.0%}"
+        else:
+          delta_accuracy = None
+        st.metric(label="Accuracy (last batch)", value=f"{epoch_accurracies[-1]:.0%}", delta=delta_accuracy)
+    # with col1:
+    #   st.button("Reset", on_click=reset_batch_props)
+    # with col2:
+    #   if epoch_accurracies:
+    #     st.pyplot(models.sparkline(epoch_accurracies, ylim=[0, max(epoch_accurracies)*1.1]), transparent=True)
+    with col4:
+      batch_count = len(scored_set)
+      batch_size = len(parsed_scored_keywords)
+      st.progress(batch_count / batch_size, text=f"Batch completion {batch_count:d}/{batch_size:d}")
+
+    with elements("placeholder"):
+      mui.Typography("You can fetch a new batch to improve the accuracy of the Student", align="center", sx={"mt": 2})
+    st.button("Sample a new batch", on_click=handle_sample_batch)
+
+
+  ##
+  # 4. Download scored keywords
+
+  st.header("Download negative keywords to remove")
+  st.markdown("Identified by the AI Student **and confirmed by a human expert**!")
+
+  stop_training = st.button(
+      "Stop the training",
+      key="stop_training"
+  )
+  if stop_training:
+    keywords_to_remove_reviewed = []
+    for kw, human_eval in evaluations.items():
+      if human_eval.should_remove():
+        keywords_to_remove_reviewed.append(kw)
+    df_output = df_filtered.query("keyword in @keywords_to_remove_reviewed")
+    st.dataframe(df_output, height=200)
+    st.download_button(
+        "Download", df_output.to_csv(index=False), file_name="negative_keywords_to_remove.csv")

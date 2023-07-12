@@ -33,7 +33,7 @@ def get_credentials(config: Dict[str, Any]):
         except Exception as error:
             if 'invalid_scope' in error.args[0]:
                 creds = None
-                
+
     if not creds.valid:
         creds = None
 
