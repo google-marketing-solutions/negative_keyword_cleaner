@@ -129,7 +129,7 @@ def display_page():
     modify_api_config = any([
         not st.session_state.valid_api_config,
         st.session_state.updating_config == _CONFIG_AI_API])
-    with st.expander("**OAuth Credentials**",expanded=modify_credentials):
+    with st.expander("**Google Cloud Platform Credentials (OAuth)**",expanded=modify_credentials):
         with st.form("Authentication"):
             if all([
                 not st.session_state.updating_config,

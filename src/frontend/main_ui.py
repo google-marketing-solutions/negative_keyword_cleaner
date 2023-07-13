@@ -148,6 +148,14 @@ def display_page():
         height=150
     )
 
+    st.info("Happy to know more about what you don't want to target ads for", icon="🎓")
+
+    exclude_pitch = st.text_area(
+        "Exclude summary",
+        placeholder="Describe what you don't want to target ads for",
+        height=50
+    )
+
 
   def handle_continue_with_context():
     st.session_state.context_ready = True
@@ -387,7 +395,7 @@ def display_page():
       llm_chain = LLMChain(prompt=prompt, llm=scoring_llm, verbose=True)
       try:
         scored_keywords = llm_chain.run({
-            "company_segment": company_pitch,
+            "company_segment": "\n\n".join(filter(None, [company_pitch, exclude_pitch])),
             "facts_segment": formatted_facts,
             "keywords_segment": formatted_keywords,
             "category_allowed_values": ", ".join(x.value for x in models.ScoreCategory),
@@ -486,21 +494,25 @@ def display_page():
 
 
   def render_item_card(item: models.KeywordEvaluation):
+    kw_lines = df_keywords.loc[df_keywords.keyword == item.keyword]
+    kw_campaigns = kw_lines.campaign_name.tolist()
+
     with mui.Card(key="first_item", sx={"display": "flex", "flexDirection": "column", "borderRadius": 3}, elevation=1):
       mui.CardHeader(
           title=item.keyword,
-          sx={"background": "rgba(255, 255, 255, 0.1)"},
+          titleTypographyProps={"variant": "h6"},
+          sx={"background": "rgba(250, 250, 250, 0.1)"},
       )
 
       if keyword_feedback_eval is not None and keyword_feedback_eval.keyword == item.keyword:
-        with mui.CardContent(sx={"flex": 1}):
+        with mui.CardContent(sx={"flex": 1, "pt": 0, "pb": 0}):
           with mui.Table(), mui.TableBody():
-            with mui.TableRow(sx={'&:last-child td, &:last-child th': { 'border': 0 } }):
-              with mui.TableCell(component="th", scope="row", sx={'p': 0}):
-                mui.Chip(label="Human Category")
-              with mui.TableCell(), mui.Select(value=keyword_feedback_eval.category, onChange=handler_human_category):
-                for cat in models.ScoreCategory:
-                  mui.MenuItem(cat.name, value=cat.value)
+            # with mui.TableRow(sx={'&:last-child td, &:last-child th': { 'border': 0 } }):
+            #   with mui.TableCell(component="th", scope="row", sx={'p': 0}):
+            #     mui.Chip(label="Human Category")
+            #   with mui.TableCell(), mui.Select(value=keyword_feedback_eval.category, onChange=handler_human_category):
+            #     for cat in models.ScoreCategory:
+            #       mui.MenuItem(cat.name, value=cat.value)
             with mui.TableRow(sx={'&:last-child td, &:last-child th': { 'border': 0 } }):
               with mui.TableCell(component="th", scope="row", sx={'p': 0}):
                 mui.Chip(label="Human Reason")
@@ -520,13 +532,13 @@ def display_page():
           mui.Button("Save human feedback", color="success", onClick=define_handler_save_human_eval(item), sx={"margin-right": "auto"})
           mui.Button("Cancel", onClick=handler_cancel_human_eval, sx={"color": "#999999"})
       else:
-        with mui.CardContent(sx={"flex": 1}):
+        with mui.CardContent(sx={"flex": 1, "pt": 0, "pb": 0}):
           with mui.Table(), mui.TableBody():
             with mui.TableRow(sx={'&:last-child td, &:last-child th': { 'border': 0 } }):
               with mui.TableCell(component="th", scope="row", sx={'p': 0}):
-                mui.Chip(label="AI Category")
+                mui.Chip(label=f"{len(kw_campaigns)} Campaign{'s' if len(kw_campaigns) > 1 else ''}")
               with mui.TableCell():
-                mui.Typography(item.category.name)
+                mui.Typography(",".join(kw_campaigns))
             with mui.TableRow(sx={'&:last-child td, &:last-child th': { 'border': 0 } }):
               with mui.TableCell(component="th", scope="row", sx={'p': 0}):
                 mui.Chip(label="AI Reason")
@@ -542,7 +554,7 @@ def display_page():
     with elements("cards"):
       with mui.Grid(container=True):
         with mui.Grid(item=True, xs=True):
-          mui.Typography(f"Candidates to remove ({len(keywords_to_remove)})", variant="h4", sx={"mb": 2})
+          mui.Typography(f"Candidates to remove ({len(keywords_to_remove)})", variant="h5", sx={"mb": 2})
           with mui.Stack(spacing=2, direction="column", useFlexGap=True):
             if not keywords_to_remove:
               mui.Typography("No more.")
@@ -550,7 +562,7 @@ def display_page():
               render_item_card(item)
         mui.Divider(orientation="vertical", flexItem=True, sx={"mx": 4})
         with mui.Grid(item=True, xs=True):
-          mui.Typography(f"Candidates to keep ({len(keywords_to_keep)})", variant="h4", sx={"mb": 2})
+          mui.Typography(f"Candidates to keep ({len(keywords_to_keep)})", variant="h5", sx={"mb": 2})
           with mui.Stack(spacing=2, direction="column", useFlexGap=True):
             if not keywords_to_keep:
               mui.Typography("No more.")
