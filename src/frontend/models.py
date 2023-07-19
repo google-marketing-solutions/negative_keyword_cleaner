@@ -178,6 +178,10 @@ def format_scoring_fragment(evaluations: OrderedDict[str, KeywordEvaluation]) ->
 
 def parse_scoring_response(response: str) -> list[KeywordEvaluation]:
     """Parses the LLM response, expecting a YAML format."""
+
+    # PALM 2 cleaning
+    response = response.replace('```', '')
+
     data = yaml.safe_load(response)
     outputs = []
     for d in data:

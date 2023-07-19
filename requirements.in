@@ -15,4 +15,5 @@ streamlit-elements
 matplotlib
 google-auth-oauthlib
 google-auth-httplib2
+google-cloud-aiplatform
 alive-progress

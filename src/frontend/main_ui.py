@@ -15,6 +15,7 @@
 from collections import defaultdict, OrderedDict
 import dataclasses
 import json
+import os
 import pickle
 import random
 import textwrap
@@ -23,7 +24,7 @@ from typing import Callable
 
 from langchain import PromptTemplate
 from langchain.chains import LLMChain
-from langchain.llms import OpenAI
+from langchain.llms import VertexAI, OpenAI
 from langchain.llms.fake import FakeListLLM
 from openai.error import OpenAIError
 import pandas as pd
@@ -51,7 +52,7 @@ SCHEMA_EVALUATIONS = {
         reason="It is safe to target this keyword"),
 }
 
-DEBUG_SUMMARY = True
+DEBUG_SUMMARY = False
 DEBUG_SCORING = False
 
 
@@ -95,11 +96,22 @@ def display_page():
         "Nike is a global sportswear and lifestyle brand that sells a variety of products including shoes, apparel, and accessories, as well as services such as Nike App, Nike Run Club, Nike Training Club, SNKRS, and Factory Store. They offer exclusive collections and collaborations with top athletes and influencers, as well as guides on their products and support on order status, shipping and delivery, returns, payment methods, and promo codes. They also provide information about their company, news, careers, investors, sustainability, and legal information."
     ]
     llm = FakeListLLM(responses=responses)
+  elif st.session_state.config.google_api_key:
+    print("Picked Google PALM model for summarizing")
+    os.environ["GOOGLE_API_KEY"] = st.session_state.config.google_api_key
+    llm = VertexAI(
+        model_name="text-bison",
+        temperature=0.2,
+        top_p=0.98,
+        top_k=40,
+        max_output_tokens=1024,
+    )
   else:
+    print("Picked OpenAI 3.5-turbo model for summarizing")
     llm = OpenAI(
         temperature=0.2,
         max_tokens=1024,
-        openai_api_key=st.session_state.config.google_api_key or st.session_state.config.openai_api_key,
+        openai_api_key=st.session_state.config.openai_api_key,
     )
 
 
@@ -382,11 +394,23 @@ def display_page():
               decision: remove
             """)
         ])
+  elif st.session_state.config.google_api_key:
+    print("Picked Google PALM model for scoring")
+    os.environ["GOOGLE_API_KEY"] = st.session_state.config.google_api_key
+    scoring_llm = VertexAI(
+        model_name="code-bison",
+        temperature=0.1,
+        top_p=0.98,
+        top_k=40,
+        max_output_tokens=1024,
+    )
   else:
+    print("Picked OpenAI 3.5-turbo model for scoring")
     scoring_llm = OpenAI(
+        model_name="gpt-3.5-turbo",  # Defaults to "text-davinci-003" (not an instruction-tuned model).
         temperature=0.1,
         max_tokens=2048,
-        openai_api_key=st.session_state.config.google_api_key or st.session_state.config.openai_api_key,
+        openai_api_key=st.session_state.config.openai_api_key,
     )
 
   scored_keywords = st.session_state.get("scored_keywords", None)

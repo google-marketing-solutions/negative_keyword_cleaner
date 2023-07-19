@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import pathlib
 import yaml
 from dataclasses import dataclass, asdict
 
-CONFIG_FILE = './app_config.yaml'
+CONFIG_FILE = (pathlib.Path(__file__).parents[2] / 'app_config.yaml').absolute()
 
 
 @dataclass
@@ -36,6 +38,8 @@ class Config:
 
     @classmethod
     def from_disk(cls):
+        if not os.path.exists(CONFIG_FILE):
+            return cls()
         with open(CONFIG_FILE, 'r') as f:
             config = yaml.load(f, Loader=yaml.SafeLoader)
         return cls(**config)
