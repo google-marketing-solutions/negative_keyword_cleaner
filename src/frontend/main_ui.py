@@ -116,7 +116,8 @@ def display_page():
 
 
   ##
-  # Company Details
+  # 1. Company Details
+  #
 
   with st.expander("1. Company Details", expanded=st.session_state.get('context_open', True)):
     company_homepage_url = st.text_input(
@@ -185,7 +186,8 @@ def display_page():
 
 
   ##
-  # Loads keywords
+  # 2. Loads keywords
+  #
 
   @st.cache_resource(show_spinner=False)
   def load_keywords():
@@ -322,314 +324,318 @@ def display_page():
 
 
   ##
-  # Samples and Scores the sampled batch.
+  # 3. Samples and Scores the sampled batch.
+  #
 
   if "evaluations" not in st.session_state:
     reset_evaluations()
 
   evaluations = st.session_state.evaluations
-  random_state = st.session_state.get("random_state", models.get_random_state())
-  df_keywords = models.sample_batch(
-      df_filtered,
-      batch_size=SAMPLE_BATCH_SIZE,
-      exclude_keywords=set(evaluations.keys()),
-      random_state=random_state)
 
-  # col1, col2 = st.columns(2)
-  # with col1:
-  #   st.button("Save evaluations", on_click=save_evaluations)
-  # with col2:
-  #   st.button("Load evaluations", on_click=load_evaluations)
+  if not st.session_state.get('stop_training'):
+    random_state = st.session_state.get("random_state", models.get_random_state())
+    df_keywords = models.sample_batch(
+        df_filtered,
+        batch_size=SAMPLE_BATCH_SIZE,
+        exclude_keywords=set(evaluations.keys()),
+        random_state=random_state)
 
-  formatted_facts = models.format_scoring_fragment(st.session_state.evaluations or SCHEMA_EVALUATIONS)
-  formatted_keywords = yaml.dump(df_keywords['keyword'].tolist(), allow_unicode=True)
+    # col1, col2 = st.columns(2)
+    # with col1:
+    #   st.button("Save evaluations", on_click=save_evaluations)
+    # with col2:
+    #   st.button("Load evaluations", on_click=load_evaluations)
 
-  template = textwrap.dedent("""\
-      You are an agent working for a Google Ads agency asked to score keyword against .
+    formatted_facts = models.format_scoring_fragment(st.session_state.evaluations or SCHEMA_EVALUATIONS)
+    formatted_keywords = yaml.dump(df_keywords['keyword'].tolist(), allow_unicode=True)
 
-      {company_segment}
+    template = textwrap.dedent("""\
+        You are an agent working for a Google Ads agency asked to score keyword against .
 
-      Learn from these examples scored by an expert, formatted as a yaml output, especially learn from the reason column:
+        {company_segment}
 
-      {facts_segment}
+        Learn from these examples scored by an expert, formatted as a yaml output, especially learn from the reason column:
 
-      The category field can only take one of the following values: {category_allowed_values}.
-      The decision field can only take one of the following values: {decision_allowed_values}.
-      The reason field is a free form string that explains why it picked this category and decision.
+        {facts_segment}
 
-      The decision to keep a keyword means that this keyword should be excluded from targeting.
-      The decision to remove a keyword means that we want to target this keyword.
+        The category field can only take one of the following values: {category_allowed_values}.
+        The decision field can only take one of the following values: {decision_allowed_values}.
+        The reason field is a free form string that explains why it picked this category and decision.
 
-      Given this context and examples, score this new list of keywords with relevancy and add a detailed reason why you scored that way inspired by the reason used in our examples above:
+        The decision to keep a keyword means that this keyword should be excluded from targeting.
+        The decision to remove a keyword means that we want to target this keyword.
 
-      {keywords_segment}
-      """)
-  prompt = PromptTemplate(
-      template=template,
-      input_variables=["company_segment", "facts_segment", "keywords_segment", "category_allowed_values", "decision_allowed_values"],
-  )
+        Given this context and examples, score this new list of keywords with relevancy and add a detailed reason why you scored that way inspired by the reason used in our examples above:
 
-  if DEBUG_SCORING:
-    scoring_llm = FakeListLLM(responses=[
-        textwrap.dedent("""\
-            - keyword: taille coffre renault arkana
-              category: brand-safety
-              reason: It is safe to target this keyword as it is related to a Renault product
-              decision: remove
-            - keyword: "location v\xE9hicule utilitaire"
-              category: other
-              reason: Can target this generic query
-              decision: remove
-            - keyword: acheter une renault captur hybride
-              category: other
-              reason: Safe to target hybrid models
-              decision: remove
-            - keyword: accessoires renault trafic
-              category: other
-              reason: We don't want to sell accessories
-              decision: keep
-            - keyword: essai citadine
-              category: other
-              reason: Safe to target generic model queries
-              decision: remove
-            """)
-        ])
-  elif st.session_state.config.google_api_key:
-    print("Picked Google PALM model for scoring")
-    os.environ["GOOGLE_API_KEY"] = st.session_state.config.google_api_key
-    scoring_llm = VertexAI(
-        model_name="code-bison",
-        temperature=0.1,
-        top_p=0.98,
-        top_k=40,
-        max_output_tokens=1024,
-    )
-  else:
-    print("Picked OpenAI 3.5-turbo model for scoring")
-    scoring_llm = OpenAI(
-        model_name="gpt-3.5-turbo",  # Defaults to "text-davinci-003" (not an instruction-tuned model).
-        temperature=0.1,
-        max_tokens=2048,
-        openai_api_key=st.session_state.config.openai_api_key,
+        {keywords_segment}
+        """)
+    prompt = PromptTemplate(
+        template=template,
+        input_variables=["company_segment", "facts_segment", "keywords_segment", "category_allowed_values", "decision_allowed_values"],
     )
 
-  scored_keywords = st.session_state.get("scored_keywords", None)
-  if not scored_keywords:
-    with st.spinner("Scoring this batch of keywords..."):
-      llm_chain = LLMChain(prompt=prompt, llm=scoring_llm, verbose=True)
-      try:
-        scored_keywords = llm_chain.run({
-            "company_segment": "\n\n".join(filter(None, [company_pitch, exclude_pitch])),
-            "facts_segment": formatted_facts,
-            "keywords_segment": formatted_keywords,
-            "category_allowed_values": ", ".join(x.value for x in models.ScoreCategory),
-            "decision_allowed_values": ", ".join(x.value for x in models.ScoreDecision),
-        })
-      # TODO(dulacp): catch the same exception for PALM 2
-      except OpenAIError as inst:
-        st.error(f"Failed to run OpenAI LLM due to error: {inst}")
-        st.stop()
-      else:
-        st.session_state.scored_keywords = scored_keywords
-
-  parsed_scored_keywords = models.parse_scoring_response(scored_keywords)
-  if "batch_scored_keywords" not in st.session_state:
-    st.session_state.batch_scored_keywords = set()
-  if "batch_eval_pairs" not in st.session_state:
-    st.session_state.batch_eval_pairs = list()
-  scored_set = st.session_state.get("batch_scored_keywords", set())
-  eval_pairs = st.session_state.get("batch_eval_pairs", list())
-
-  # st.header("Teach me")
-  if not evaluations:
-    st.info("Help me improve my knowledge by correcting my following guesses. I will get better over time.", icon="🎓")
-  else:
-    st.success(f"I've learned from {len(evaluations)} human evaluations. Keep on correcting me to improve my accuracy!", icon="🎓")
-
-  # Splits keywords on the LLM decision, to simplify the review process
-  keywords_to_remove = []
-  keywords_to_keep = []
-  keywords_unknown = []
-  for item in parsed_scored_keywords:
-    if item.keyword in scored_set:
-      continue
-    match item.decision:
-      case models.ScoreDecision.KEEP:
-        keywords_to_keep.append(item)
-      case models.ScoreDecision.REMOVE:
-        keywords_to_remove.append(item)
-      case models.ScoreDecision.UNKNOWN:
-        keywords_unknown.append(item)
-
-  # Tracks keyword when a user disagrees.
-  keyword_feedback_eval = st.session_state.get("keyword_feedback_eval", None)
-
-
-  def save_human_eval(*, human_eval: models.KeywordEvaluation, llm_eval: models.KeywordEvaluation):
-    evaluations[human_eval.keyword] = human_eval
-    scored_set.add(human_eval.keyword)
-    eval_pairs.append(models.EvaluationPair(llm_decision=llm_eval.decision, human_decision=human_eval.decision))
-
-
-  def define_handler_scoring(llm_eval: models.KeywordEvaluation, human_agree_with_llm: bool) -> Callable:
-    def _inner():
-      if not human_agree_with_llm:
-        st.session_state.keyword_feedback_eval = models.KeywordEvaluation(
-            llm_eval.keyword,
-            category=llm_eval.category,
-            reason=llm_eval.reason,
-            decision=llm_eval.opposite_decision)
-        return
-
-      human_eval = models.KeywordEvaluation(
-          keyword=llm_eval.keyword,
-          category=llm_eval.category,
-          decision=llm_eval.decision,
-          reason=llm_eval.reason)
-      save_human_eval(human_eval=human_eval, llm_eval=llm_eval)
-    return _inner
-
-
-  def handler_cancel_human_eval():
-    st.session_state.keyword_feedback_eval = None
-
-
-  def handler_human_category(event, value):
-    keyword_feedback_eval.category = value["props"]["value"]
-
-
-  def handler_human_decision(event, value):
-    keyword_feedback_eval.decision = value["props"]["value"]
-
-
-  def handler_human_reason(event):
-    keyword_feedback_eval.reason = event.target.value
-
-
-  def define_handler_save_human_eval(llm_eval: models.KeywordEvaluation) -> Callable:
-    def _inner():
-      human_eval = models.KeywordEvaluation(
-          keyword=llm_eval.keyword,
-          category=keyword_feedback_eval.category,
-          decision=keyword_feedback_eval.decision,
-          reason=keyword_feedback_eval.reason)
-      save_human_eval(human_eval=human_eval, llm_eval=llm_eval)
-    return _inner
-
-
-  def render_item_card(item: models.KeywordEvaluation):
-    kw_lines = df_keywords.loc[df_keywords.keyword == item.keyword]
-    kw_campaigns = kw_lines.campaign_name.tolist()
-
-    with mui.Card(key="first_item", sx={"display": "flex", "flexDirection": "column", "borderRadius": 3}, elevation=1):
-      mui.CardHeader(
-          title=item.keyword,
-          titleTypographyProps={"variant": "h6"},
-          sx={"background": "rgba(250, 250, 250, 0.1)"},
+    if DEBUG_SCORING:
+      scoring_llm = FakeListLLM(responses=[
+          textwrap.dedent("""\
+              - keyword: taille coffre renault arkana
+                category: brand-safety
+                reason: It is safe to target this keyword as it is related to a Renault product
+                decision: remove
+              - keyword: "location v\xE9hicule utilitaire"
+                category: other
+                reason: Can target this generic query
+                decision: remove
+              - keyword: acheter une renault captur hybride
+                category: other
+                reason: Safe to target hybrid models
+                decision: remove
+              - keyword: accessoires renault trafic
+                category: other
+                reason: We don't want to sell accessories
+                decision: keep
+              - keyword: essai citadine
+                category: other
+                reason: Safe to target generic model queries
+                decision: remove
+              """)
+          ])
+    elif st.session_state.config.google_api_key:
+      print("Picked Google PALM model for scoring")
+      os.environ["GOOGLE_API_KEY"] = st.session_state.config.google_api_key
+      scoring_llm = VertexAI(
+          model_name="code-bison",
+          temperature=0.1,
+          top_p=0.98,
+          top_k=40,
+          max_output_tokens=1024,
+      )
+    else:
+      print("Picked OpenAI 3.5-turbo model for scoring")
+      scoring_llm = OpenAI(
+          model_name="gpt-3.5-turbo",  # Defaults to "text-davinci-003" (not an instruction-tuned model).
+          temperature=0.1,
+          max_tokens=2048,
+          openai_api_key=st.session_state.config.openai_api_key,
       )
 
-      if keyword_feedback_eval is not None and keyword_feedback_eval.keyword == item.keyword:
-        with mui.CardContent(sx={"flex": 1, "pt": 0, "pb": 0}):
-          with mui.Table(), mui.TableBody():
-            # with mui.TableRow(sx={'&:last-child td, &:last-child th': { 'border': 0 } }):
-            #   with mui.TableCell(component="th", scope="row", sx={'p': 0}):
-            #     mui.Chip(label="Human Category")
-            #   with mui.TableCell(), mui.Select(value=keyword_feedback_eval.category, onChange=handler_human_category):
-            #     for cat in models.ScoreCategory:
-            #       mui.MenuItem(cat.name, value=cat.value)
-            with mui.TableRow(sx={'&:last-child td, &:last-child th': { 'border': 0 } }):
-              with mui.TableCell(component="th", scope="row", sx={'p': 0}):
-                mui.Chip(label="Human Reason")
-              with mui.TableCell():
-                mui.TextField(
-                    multiline=True,
-                    placeholder="Explain your rating (e.g. 'Competitor product')",
-                    defaultValue=keyword_feedback_eval.reason,
-                    onChange=lazy(handler_human_reason))
-            with mui.TableRow(sx={'&:last-child td, &:last-child th': { 'border': 0 } }):
-              with mui.TableCell(component="th", scope="row", sx={'p': 0}):
-                mui.Chip(label="Human Decision")
-              with mui.TableCell(), mui.Select(value=keyword_feedback_eval.decision, onChange=handler_human_decision):
-                for dec in models.ScoreDecision:
-                  mui.MenuItem(dec.name, value=dec.value)
-        with mui.CardActions(disableSpacing=True, sx={"margin-top": "auto"}):
-          mui.Button("Save human feedback", color="success", onClick=define_handler_save_human_eval(item), sx={"margin-right": "auto"})
-          mui.Button("Cancel", onClick=handler_cancel_human_eval, sx={"color": "#999999"})
-      else:
-        with mui.CardContent(sx={"flex": 1, "pt": 0, "pb": 0}):
-          with mui.Table(), mui.TableBody():
-            with mui.TableRow(sx={'&:last-child td, &:last-child th': { 'border': 0 } }):
-              with mui.TableCell(component="th", scope="row", sx={'p': 0}):
-                mui.Chip(label=f"{len(kw_campaigns)} Campaign{'s' if len(kw_campaigns) > 1 else ''}")
-              with mui.TableCell():
-                mui.Typography(",".join(kw_campaigns))
-            with mui.TableRow(sx={'&:last-child td, &:last-child th': { 'border': 0 } }):
-              with mui.TableCell(component="th", scope="row", sx={'p': 0}):
-                mui.Chip(label="AI Reason")
-              with mui.TableCell():
-                mui.Typography(item.reason or "Empty")
-        with mui.CardActions(disableSpacing=True, sx={"margin-top": "auto"}):
-          mui.Button("Disagree with Student", color="error", onClick=define_handler_scoring(item, human_agree_with_llm=False), sx={"margin-right": "auto"})
-          mui.Button("Agree with Student", color="success", onClick=define_handler_scoring(item, human_agree_with_llm=True))
-
-
-  # Display cards
-  if keywords_to_remove or keywords_to_keep:
-    with elements("cards"):
-      with mui.Grid(container=True):
-        with mui.Grid(item=True, xs=True):
-          mui.Typography(f"Candidates to remove ({len(keywords_to_remove)})", variant="h5", sx={"mb": 2})
-          with mui.Stack(spacing=2, direction="column", useFlexGap=True):
-            if not keywords_to_remove:
-              mui.Typography("No more.")
-            for item in keywords_to_remove:
-              render_item_card(item)
-        mui.Divider(orientation="vertical", flexItem=True, sx={"mx": 4})
-        with mui.Grid(item=True, xs=True):
-          mui.Typography(f"Candidates to keep ({len(keywords_to_keep)})", variant="h5", sx={"mb": 2})
-          with mui.Stack(spacing=2, direction="column", useFlexGap=True):
-            if not keywords_to_keep:
-              mui.Typography("No more.")
-            for item in keywords_to_keep:
-              render_item_card(item)
-  else:
-    # Scores the batch if needed.
-    score_batch_evals()
-
-    # Computes each batch evaluation accuracy.
-    epoch_eval_pairs = st.session_state.get("epoch_eval_pairs", [])
-    epoch_accurracies = []
-    for eval_pair in epoch_eval_pairs:
-      accuracy = sum(p.llm_decision == p.human_decision for p in eval_pair) / len(eval_pair)
-      epoch_accurracies.append(accuracy)
-    print("epoch_accurracies:", epoch_accurracies)
-
-    col3, col4 = st.columns(2)
-    with col3:
-      if epoch_accurracies:
-        if len(epoch_accurracies) > 1:
-          delta_accuracy = (epoch_accurracies[-1] - epoch_accurracies[-2]) / epoch_accurracies[-2]
-          delta_accuracy = f"{delta_accuracy:.0%}"
+    scored_keywords = st.session_state.get("scored_keywords", None)
+    if not scored_keywords:
+      with st.spinner("Scoring this batch of keywords..."):
+        llm_chain = LLMChain(prompt=prompt, llm=scoring_llm, verbose=True)
+        try:
+          scored_keywords = llm_chain.run({
+              "company_segment": "\n\n".join(filter(None, [company_pitch, exclude_pitch])),
+              "facts_segment": formatted_facts,
+              "keywords_segment": formatted_keywords,
+              "category_allowed_values": ", ".join(x.value for x in models.ScoreCategory),
+              "decision_allowed_values": ", ".join(x.value for x in models.ScoreDecision),
+          })
+        # TODO(dulacp): catch the same exception for PALM 2
+        except OpenAIError as inst:
+          st.error(f"Failed to run OpenAI LLM due to error: {inst}")
+          st.stop()
         else:
-          delta_accuracy = None
-        st.metric(label="Accuracy (last batch)", value=f"{epoch_accurracies[-1]:.0%}", delta=delta_accuracy)
-    # with col1:
-    #   st.button("Reset", on_click=reset_batch_props)
-    # with col2:
-    #   if epoch_accurracies:
-    #     st.pyplot(models.sparkline(epoch_accurracies, ylim=[0, max(epoch_accurracies)*1.1]), transparent=True)
-    with col4:
-      batch_count = len(scored_set)
-      batch_size = len(parsed_scored_keywords)
-      st.progress(batch_count / batch_size, text=f"Batch completion {batch_count:d}/{batch_size:d}")
+          st.session_state.scored_keywords = scored_keywords
 
-    with elements("placeholder"):
-      mui.Typography("You can fetch a new batch to improve the accuracy of the Student", align="center", sx={"mt": 2})
-    st.button("Sample a new batch", on_click=handle_sample_batch)
+    parsed_scored_keywords = models.parse_scoring_response(scored_keywords)
+    if "batch_scored_keywords" not in st.session_state:
+      st.session_state.batch_scored_keywords = set()
+    if "batch_eval_pairs" not in st.session_state:
+      st.session_state.batch_eval_pairs = list()
+    scored_set = st.session_state.get("batch_scored_keywords", set())
+    eval_pairs = st.session_state.get("batch_eval_pairs", list())
+
+    # st.header("Teach me")
+    if not evaluations:
+      st.info("Help me improve my knowledge by correcting my following guesses. I will get better over time.", icon="🎓")
+    else:
+      st.success(f"I've learned from {len(evaluations)} human evaluations. Keep on correcting me to improve my accuracy!", icon="🎓")
+
+    # Splits keywords on the LLM decision, to simplify the review process
+    keywords_to_remove = []
+    keywords_to_keep = []
+    keywords_unknown = []
+    for item in parsed_scored_keywords:
+      if item.keyword in scored_set:
+        continue
+      match item.decision:
+        case models.ScoreDecision.KEEP:
+          keywords_to_keep.append(item)
+        case models.ScoreDecision.REMOVE:
+          keywords_to_remove.append(item)
+        case models.ScoreDecision.UNKNOWN:
+          keywords_unknown.append(item)
+
+    # Tracks keyword when a user disagrees.
+    keyword_feedback_eval = st.session_state.get("keyword_feedback_eval", None)
+
+
+    def save_human_eval(*, human_eval: models.KeywordEvaluation, llm_eval: models.KeywordEvaluation):
+      evaluations[human_eval.keyword] = human_eval
+      scored_set.add(human_eval.keyword)
+      eval_pairs.append(models.EvaluationPair(llm_decision=llm_eval.decision, human_decision=human_eval.decision))
+
+
+    def define_handler_scoring(llm_eval: models.KeywordEvaluation, human_agree_with_llm: bool) -> Callable:
+      def _inner():
+        if not human_agree_with_llm:
+          st.session_state.keyword_feedback_eval = models.KeywordEvaluation(
+              llm_eval.keyword,
+              category=llm_eval.category,
+              reason=llm_eval.reason,
+              decision=llm_eval.opposite_decision)
+          return
+
+        human_eval = models.KeywordEvaluation(
+            keyword=llm_eval.keyword,
+            category=llm_eval.category,
+            decision=llm_eval.decision,
+            reason=llm_eval.reason)
+        save_human_eval(human_eval=human_eval, llm_eval=llm_eval)
+      return _inner
+
+
+    def handler_cancel_human_eval():
+      st.session_state.keyword_feedback_eval = None
+
+
+    def handler_human_category(event, value):
+      keyword_feedback_eval.category = value["props"]["value"]
+
+
+    def handler_human_decision(event, value):
+      keyword_feedback_eval.decision = value["props"]["value"]
+
+
+    def handler_human_reason(event):
+      keyword_feedback_eval.reason = event.target.value
+
+
+    def define_handler_save_human_eval(llm_eval: models.KeywordEvaluation) -> Callable:
+      def _inner():
+        human_eval = models.KeywordEvaluation(
+            keyword=llm_eval.keyword,
+            category=keyword_feedback_eval.category,
+            decision=keyword_feedback_eval.decision,
+            reason=keyword_feedback_eval.reason)
+        save_human_eval(human_eval=human_eval, llm_eval=llm_eval)
+      return _inner
+
+
+    def render_item_card(item: models.KeywordEvaluation):
+      kw_lines = df_keywords.loc[df_keywords.keyword == item.keyword]
+      kw_campaigns = kw_lines.campaign_name.tolist()
+
+      with mui.Card(key="first_item", sx={"display": "flex", "flexDirection": "column", "borderRadius": 3}, elevation=1):
+        mui.CardHeader(
+            title=item.keyword,
+            titleTypographyProps={"variant": "h6"},
+            sx={"background": "rgba(250, 250, 250, 0.1)"},
+        )
+
+        if keyword_feedback_eval is not None and keyword_feedback_eval.keyword == item.keyword:
+          with mui.CardContent(sx={"flex": 1, "pt": 0, "pb": 0}):
+            with mui.Table(), mui.TableBody():
+              # with mui.TableRow(sx={'&:last-child td, &:last-child th': { 'border': 0 } }):
+              #   with mui.TableCell(component="th", scope="row", sx={'p': 0}):
+              #     mui.Chip(label="Human Category")
+              #   with mui.TableCell(), mui.Select(value=keyword_feedback_eval.category, onChange=handler_human_category):
+              #     for cat in models.ScoreCategory:
+              #       mui.MenuItem(cat.name, value=cat.value)
+              with mui.TableRow(sx={'&:last-child td, &:last-child th': { 'border': 0 } }):
+                with mui.TableCell(component="th", scope="row", sx={'p': 0}):
+                  mui.Chip(label="Human Reason")
+                with mui.TableCell():
+                  mui.TextField(
+                      multiline=True,
+                      placeholder="Explain your rating (e.g. 'Competitor product')",
+                      defaultValue=keyword_feedback_eval.reason,
+                      onChange=lazy(handler_human_reason))
+              with mui.TableRow(sx={'&:last-child td, &:last-child th': { 'border': 0 } }):
+                with mui.TableCell(component="th", scope="row", sx={'p': 0}):
+                  mui.Chip(label="Human Decision")
+                with mui.TableCell(), mui.Select(value=keyword_feedback_eval.decision, onChange=handler_human_decision):
+                  for dec in models.ScoreDecision:
+                    mui.MenuItem(dec.name, value=dec.value)
+          with mui.CardActions(disableSpacing=True, sx={"margin-top": "auto"}):
+            mui.Button("Save human feedback", color="success", onClick=define_handler_save_human_eval(item), sx={"margin-right": "auto"})
+            mui.Button("Cancel", onClick=handler_cancel_human_eval, sx={"color": "#999999"})
+        else:
+          with mui.CardContent(sx={"flex": 1, "pt": 0, "pb": 0}):
+            with mui.Table(), mui.TableBody():
+              with mui.TableRow(sx={'&:last-child td, &:last-child th': { 'border': 0 } }):
+                with mui.TableCell(component="th", scope="row", sx={'p': 0}):
+                  mui.Chip(label=f"{len(kw_campaigns)} Campaign{'s' if len(kw_campaigns) > 1 else ''}")
+                with mui.TableCell():
+                  mui.Typography(",".join(kw_campaigns))
+              with mui.TableRow(sx={'&:last-child td, &:last-child th': { 'border': 0 } }):
+                with mui.TableCell(component="th", scope="row", sx={'p': 0}):
+                  mui.Chip(label="AI Reason")
+                with mui.TableCell():
+                  mui.Typography(item.reason or "Empty")
+          with mui.CardActions(disableSpacing=True, sx={"margin-top": "auto"}):
+            mui.Button("Disagree with Student", color="error", onClick=define_handler_scoring(item, human_agree_with_llm=False), sx={"margin-right": "auto"})
+            mui.Button("Agree with Student", color="success", onClick=define_handler_scoring(item, human_agree_with_llm=True))
+
+
+    # Display cards
+    if keywords_to_remove or keywords_to_keep:
+      with elements("cards"):
+        with mui.Grid(container=True):
+          with mui.Grid(item=True, xs=True):
+            mui.Typography(f"Candidates to remove ({len(keywords_to_remove)})", variant="h5", sx={"mb": 2})
+            with mui.Stack(spacing=2, direction="column", useFlexGap=True):
+              if not keywords_to_remove:
+                mui.Typography("No more.")
+              for item in keywords_to_remove:
+                render_item_card(item)
+          mui.Divider(orientation="vertical", flexItem=True, sx={"mx": 4})
+          with mui.Grid(item=True, xs=True):
+            mui.Typography(f"Candidates to keep ({len(keywords_to_keep)})", variant="h5", sx={"mb": 2})
+            with mui.Stack(spacing=2, direction="column", useFlexGap=True):
+              if not keywords_to_keep:
+                mui.Typography("No more.")
+              for item in keywords_to_keep:
+                render_item_card(item)
+    else:
+      # Scores the batch if needed.
+      score_batch_evals()
+
+      # Computes each batch evaluation accuracy.
+      epoch_eval_pairs = st.session_state.get("epoch_eval_pairs", [])
+      epoch_accurracies = []
+      for eval_pair in epoch_eval_pairs:
+        accuracy = sum(p.llm_decision == p.human_decision for p in eval_pair) / len(eval_pair)
+        epoch_accurracies.append(accuracy)
+      print("epoch_accurracies:", epoch_accurracies)
+
+      col3, col4 = st.columns(2)
+      with col3:
+        if epoch_accurracies:
+          if len(epoch_accurracies) > 1:
+            delta_accuracy = (epoch_accurracies[-1] - epoch_accurracies[-2]) / epoch_accurracies[-2]
+            delta_accuracy = f"{delta_accuracy:.0%}"
+          else:
+            delta_accuracy = None
+          st.metric(label="Accuracy (last batch)", value=f"{epoch_accurracies[-1]:.0%}", delta=delta_accuracy)
+      # with col1:
+      #   st.button("Reset", on_click=reset_batch_props)
+      # with col2:
+      #   if epoch_accurracies:
+      #     st.pyplot(models.sparkline(epoch_accurracies, ylim=[0, max(epoch_accurracies)*1.1]), transparent=True)
+      with col4:
+        batch_count = len(scored_set)
+        batch_size = len(parsed_scored_keywords)
+        st.progress(batch_count / batch_size, text=f"Batch completion {batch_count:d}/{batch_size:d}")
+
+      with elements("placeholder"):
+        mui.Typography("You can fetch a new batch to improve the accuracy of the Student", align="center", sx={"mt": 2})
+      st.button("Sample a new batch", on_click=handle_sample_batch)
 
 
   ##
   # 4. Download scored keywords
+  #
 
   st.header("Download negative keywords to remove")
   st.markdown("Identified by the AI Student **and confirmed by a human expert**!")
@@ -647,3 +653,16 @@ def display_page():
     st.dataframe(df_output, height=200)
     st.download_button(
         "Download", df_output.to_csv(index=False), file_name="negative_keywords_to_remove.csv")
+
+  ##
+  # 5. Run the student on the remaining keywords
+  #
+
+  count_remaining = df_filtered.keyword.nunique() - len(evaluations)
+  st.header(f"Score the remaining {count_remaining:,} keywords")
+  st.markdown("**Will NOT modify your account**, it's purely a scoring procedure.")
+
+  score_remaining = st.button(
+      "Score remaining keywords",
+      key="score_remaining"
+  )
