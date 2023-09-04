@@ -115,7 +115,7 @@ class KeywordEvaluation:
     """LLM or Human evaluation."""
     keyword: str
     decision: ScoreDecision = ScoreDecision.UNKNOWN
-    category: ScoreCategory = ScoreCategory.UNKNOWN
+    #category: ScoreCategory = ScoreCategory.UNKNOWN
     reason: str = ""
 
     # def __getstate__(self):
@@ -143,7 +143,8 @@ class KeywordEvaluation:
         return cls(
             keyword=data["keyword"],
             decision=ScoreDecision(data.get("decision", ScoreDecision.UNKNOWN.value)),
-            category=ScoreCategory(data.get("category", ScoreCategory.UNKNOWN.value)),
+            #category=ScoreCategory(data.get("category", ScoreCategory.UNKNOWN.value)),
+            #category=ScoreCategory.UNKNOWN.value,
             reason=data.get("reason", "Unspecified")
         )
 
@@ -167,7 +168,8 @@ class EvaluationPair:
 
 def sample_batch(df: pd.DataFrame, batch_size: int, exclude_keywords: Optional[set[str]] = None, random_state: int = 0) -> list[str]:
     """Draw a new sample from our data source."""
-    return df.query("keyword not in @exclude_keywords").sample(batch_size, random_state=random_state)
+    df_filtered = df.query("keyword not in @exclude_keywords")
+    return df_filtered.sample(min(len(df_filtered), batch_size), random_state=random_state)
 
 
 def format_scoring_fragment(evaluations: OrderedDict[str, KeywordEvaluation]) -> str:
@@ -180,14 +182,19 @@ def parse_scoring_response(response: str) -> list[KeywordEvaluation]:
     """Parses the LLM response, expecting a YAML format."""
 
     # PALM 2 cleaning
-    response = response.replace('```', '')
+    response = (response
+        .replace('```yaml', '')
+        .replace('```YAML', '')
+        .replace('```', '')
+        .strip()
+    )
 
     data = yaml.safe_load(response)
     outputs = []
     for d in data:
         try:
             outputs.append(KeywordEvaluation.from_dict(d))
-        except TypeError as inst:
+        except (TypeError, ValueError) as inst:
             logger.error(f"Failed to parse keyword: {inst}")
     return outputs
 

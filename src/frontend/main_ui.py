@@ -15,6 +15,7 @@
 from collections import defaultdict, OrderedDict
 import dataclasses
 import json
+import logging
 import os
 import pickle
 import random
@@ -36,6 +37,9 @@ from .components.sidebar import display_sidebar_component
 from . import models
 from utils.keyword_helper import KeywordHelper
 
+logging.getLogger().setLevel(logging.DEBUG)
+logger = logging.Logger(__name__)
+
 
 SAMPLE_BATCH_SIZE = 5
 
@@ -43,17 +47,18 @@ SCHEMA_EVALUATIONS = {
     "bad keyword": models.KeywordEvaluation(
         "bad keyword",
         decision=models.ScoreDecision.KEEP,
-        category=models.ScoreCategory.BRAND_SAFETY,
+        #category=models.ScoreCategory.BRAND_SAFETY,
         reason="Keep as a negative for brand safety reasons"),
     "good keyword": models.KeywordEvaluation(
         "good keyword",
         decision=models.ScoreDecision.REMOVE,
-        category=models.ScoreCategory.OTHER,
+        #category=models.ScoreCategory.OTHER,
         reason="It is safe to target this keyword"),
 }
 
 DEBUG_SUMMARY = False
 DEBUG_SCORING = False
+DEBUG_SCORING_LIMIT = 300  # No limit: -1
 
 
 def get_neg_keywords(config):
@@ -407,7 +412,7 @@ def display_page():
           temperature=0.1,
           top_p=0.98,
           top_k=40,
-          max_output_tokens=1024,
+          max_output_tokens=2048,
       )
     else:
       print("Picked OpenAI 3.5-turbo model for scoring")
@@ -437,6 +442,7 @@ def display_page():
         else:
           st.session_state.scored_keywords = scored_keywords
 
+    logger.error(scored_keywords)
     parsed_scored_keywords = models.parse_scoring_response(scored_keywords)
     if "batch_scored_keywords" not in st.session_state:
       st.session_state.batch_scored_keywords = set()
@@ -481,14 +487,14 @@ def display_page():
         if not human_agree_with_llm:
           st.session_state.keyword_feedback_eval = models.KeywordEvaluation(
               llm_eval.keyword,
-              category=llm_eval.category,
+              #category=llm_eval.category,
               reason=llm_eval.reason,
               decision=llm_eval.opposite_decision)
           return
 
         human_eval = models.KeywordEvaluation(
             keyword=llm_eval.keyword,
-            category=llm_eval.category,
+            #category=llm_eval.category,
             decision=llm_eval.decision,
             reason=llm_eval.reason)
         save_human_eval(human_eval=human_eval, llm_eval=llm_eval)
@@ -515,7 +521,7 @@ def display_page():
       def _inner():
         human_eval = models.KeywordEvaluation(
             keyword=llm_eval.keyword,
-            category=keyword_feedback_eval.category,
+            #category=keyword_feedback_eval.category,
             decision=keyword_feedback_eval.decision,
             reason=keyword_feedback_eval.reason)
         save_human_eval(human_eval=human_eval, llm_eval=llm_eval)
@@ -645,14 +651,19 @@ def display_page():
       key="stop_training"
   )
   if stop_training:
-    keywords_to_remove_reviewed = []
-    for kw, human_eval in evaluations.items():
-      if human_eval.should_remove():
-        keywords_to_remove_reviewed.append(kw)
-    df_output = df_filtered.query("keyword in @keywords_to_remove_reviewed")
+    keyword_scored = []
+    # for kw, human_eval in evaluations.items():
+    #   if human_eval.should_remove():
+    #     keyword_scored.append(kw)
+    # df_output = df_filtered.query("keyword in @keyword_scored")
+    formatted_evals = [
+        {"keyword": kw, "human_decision": human_eval.decision, "human_reason": human_eval.reason}
+        for kw, human_eval in evaluations.items()
+    ]
+    df_output = pd.DataFrame(formatted_evals)
     st.dataframe(df_output, height=200)
     st.download_button(
-        "Download", df_output.to_csv(index=False), file_name="negative_keywords_to_remove.csv")
+        "Download trained examples", df_output.to_csv(index=False), file_name="negative_keywords_used_to_train_student.csv")
 
   ##
   # 5. Run the student on the remaining keywords
@@ -666,3 +677,84 @@ def display_page():
       "Score remaining keywords",
       key="score_remaining"
   )
+  if score_remaining:
+    scoring_progress_text = "Your trained AI-Student is now scoring the remaining keywords..."
+    scoring_bar = st.progress(0, text=scoring_progress_text)
+    scoring_seen_kws = set(evaluations.keys())
+    scoring_kws_evals = list()
+
+    if DEBUG_SCORING_LIMIT > 0:
+      df_to_score = df_filtered.iloc[:DEBUG_SCORING_LIMIT]
+    else:
+      df_to_score = df_filtered
+
+    while True:
+      random_state = st.session_state.get("random_state", models.get_random_state())
+      df_keywords = models.sample_batch(
+          df_to_score,
+          batch_size=50,
+          exclude_keywords=scoring_seen_kws,
+          random_state=random_state)
+      if len(df_keywords) == 0:
+        scoring_bar.progress(1.0, text="")
+        st.markdown("Done ✅")
+        break
+
+      formatted_facts = models.format_scoring_fragment(st.session_state.evaluations or SCHEMA_EVALUATIONS)
+      formatted_keywords = yaml.dump(df_keywords['keyword'].tolist(), allow_unicode=True)
+      llm_chain = LLMChain(prompt=prompt, llm=scoring_llm, verbose=True)
+      try:
+        latest_scored_keywords = llm_chain.run({
+            "company_segment": "\n\n".join(filter(None, [company_pitch, exclude_pitch])),
+            "facts_segment": formatted_facts,
+            "keywords_segment": formatted_keywords,
+            "category_allowed_values": ", ".join(x.value for x in models.ScoreCategory),
+            "decision_allowed_values": ", ".join(x.value for x in models.ScoreDecision),
+        })
+        logger.warning(latest_scored_keywords)
+      # TODO(dulacp): catch the same exception for PALM 2
+      except OpenAIError as inst:
+        st.error(f"Failed to run OpenAI LLM due to error: {inst}")
+        st.stop()
+
+      # Parses the results.
+      parsed_scored_keywords = models.parse_scoring_response(latest_scored_keywords)
+      scoring_kws_evals.extend(parsed_scored_keywords)
+
+      # Marks them as seen.
+      scoring_seen_kws.update(df_keywords['keyword'].tolist())
+
+      # Updates the progress bar
+      curr = len(scoring_kws_evals)
+      N = len(df_to_score)
+      scoring_bar.progress(curr/N, text=scoring_progress_text + f" {curr}/{N}")
+
+    # Keeps the results in cache
+    if scoring_kws_evals:
+      st.session_state.scoring_kws_evals = scoring_kws_evals
+
+  # Displays the download button if a scoring has been run.
+  if st.session_state.get("scoring_kws_evals", None):
+    cached_scoring_kws_evals = st.session_state["scoring_kws_evals"]
+
+    # Prepares the keywords to remove for download.
+    formatted_evals_to_remove = [
+        {"keyword": student_eval.keyword, "student_decision": student_eval.decision, "student_reason": student_eval.reason}
+        for student_eval in cached_scoring_kws_evals if student_eval.decision == models.ScoreDecision.REMOVE
+    ]
+    formatted_evals_to_keep = [
+        {"keyword": student_eval.keyword, "student_decision": student_eval.decision, "student_reason": student_eval.reason}
+        for student_eval in cached_scoring_kws_evals if student_eval.decision == models.ScoreDecision.KEEP
+    ]
+    df_to_remove = pd.DataFrame(formatted_evals_to_remove)
+    df_to_keep = pd.DataFrame(formatted_evals_to_keep)
+    st.dataframe(df_to_remove, height=200)
+    st.download_button(
+        "Download keywords to remove found by Student",
+        df_to_remove.to_csv(index=False), file_name="negative_keywords_to_remove.csv"
+    )
+    st.dataframe(df_to_keep, height=200)
+    st.download_button(
+        "Download keywords to keep with reason written by Student",
+        df_to_keep.to_csv(index=False), file_name="negative_keywords_to_keep.csv"
+    )
