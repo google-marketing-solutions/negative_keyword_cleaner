@@ -58,31 +58,7 @@ SCHEMA_EVALUATIONS = {
 
 DEBUG_SUMMARY = False
 DEBUG_SCORING = False
-DEBUG_SCORING_LIMIT = 300  # No limit: -1
-
-
-def get_neg_keywords(config):
-  # TODO: extract the negative keywords directly from here once streamlit 1.23 is released
-  # https://docs.streamlit.io/library/changelog
-  # https://github.com/streamlit/streamlit/pull/6622
-
-  # googleads_api_client = GoogleAdsApiClient(
-  # config_dict=config.__dict__,
-  # version=_GOOGLE_ADS_API_VERSION)
-  # report_fetcher = AdsReportFetcher(
-  #     googleads_api_client,
-  #     [config.login_customer_id])
-  # adgroup_neg_kws = report_fetcher.fetch(AdgroupNegativeKeywords())
-  # campaign_neg_kws = report_fetcher.fetch(CampaignNegativeKeywords())
-
-  # neg_keywords_report = adgroup_neg_kws + campaign_neg_kws
-  # displayable_report = neg_keywords_report[['keyword',
-  #                                         'match_type',
-  #                                         'level',
-  #                                         'adgroup_name',
-  #                                         'campaign_name',
-  #                                         'account_name']]
-  pass
+DEBUG_SCORING_LIMIT = 500  # No limit: -1
 
 
 def display_page():
@@ -128,15 +104,14 @@ def display_page():
     company_homepage_url = st.text_input(
         "Company Homepage URL",
         placeholder="https://...",
-        value="https://nike.com" if DEBUG_SUMMARY else "",
+        value="https://nike.com" if DEBUG_SUMMARY else st.session_state.get("company_homepage_url", ""),
     )
     if not company_homepage_url:
       st.info("Once I have their website url, I can directly read and understand "
               "who is this customer", icon="🎓")
       st.stop()
     else:
-      #st.info("Thanks!")
-      pass
+      st.session_state.company_homepage_url = company_homepage_url
 
     with st.spinner("I'm browsing their website..."):
       homepage_docs = models.fetch_landing_page_text(company_homepage_url)
@@ -663,7 +638,7 @@ def display_page():
     df_output = pd.DataFrame(formatted_evals)
     st.dataframe(df_output, height=200)
     st.download_button(
-        "Download trained examples", df_output.to_csv(index=False), file_name="negative_keywords_used_to_train_student.csv")
+        "Download fine-tuning examples", df_output.to_csv(index=False), file_name="negative_keywords_used_to_train_student.csv")
 
   ##
   # 5. Run the student on the remaining keywords
@@ -678,7 +653,7 @@ def display_page():
       key="score_remaining"
   )
   if score_remaining:
-    scoring_progress_text = "Your trained AI-Student is now scoring the remaining keywords..."
+    scoring_progress_text = "Your fine-tuned AI-Student is now scoring the remaining keywords..."
     scoring_bar = st.progress(0, text=scoring_progress_text)
     scoring_seen_kws = set(evaluations.keys())
     scoring_kws_evals = list()
@@ -718,7 +693,13 @@ def display_page():
         st.stop()
 
       # Parses the results.
-      parsed_scored_keywords = models.parse_scoring_response(latest_scored_keywords)
+      try:
+        parsed_scored_keywords = models.parse_scoring_response(latest_scored_keywords)
+      except yaml.scanner.ScannerError as inst:
+        # Skips this failed batch.
+        logger.error(f"Failed batch with error: {inst}")
+        continue
+
       scoring_kws_evals.extend(parsed_scored_keywords)
 
       # Marks them as seen.
