@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import streamlit as st
-from utils.config import Config
+from utils.config import is_appengine, Config
 
 
 def customize_css():
@@ -26,8 +26,6 @@ def customize_css():
 def initialize_session_state():
     if "valid_config" not in st.session_state:
         st.session_state.valid_config = False
-    if "valid_credentials" not in st.session_state:
-        st.session_state.valid_credentials = False
     if "valid_ads_config" not in st.session_state:
         st.session_state.valid_ads_config = False
     if "valid_api_config" not in st.session_state:
@@ -35,7 +33,7 @@ def initialize_session_state():
     if "updating_config" not in st.session_state:
         st.session_state.updating_config = None
     if "config" not in st.session_state:
-        st.session_state.config = Config.from_disk()
+        st.session_state.config = Config.from_gcs() if is_appengine() else Config.from_disk()
     if "loaded_kws" not in st.session_state:
         st.session_state.loaded_kws = []
 

@@ -294,6 +294,10 @@ pydeck==0.8.1b0
     # via streamlit
 pygments==2.15.1
     # via rich
+pyjwt==2.8.0
+    # via
+    #   -r requirements.in
+    #   st-oauth
 pympler==1.0.1
     # via streamlit
 pynacl==1.5.0
@@ -341,6 +345,7 @@ requests==2.31.0
     #   openai
     #   requests-oauthlib
     #   smart-open
+    #   st-oauth
     #   streamlit
     #   tiktoken
     #   transformers
@@ -377,9 +382,12 @@ soupsieve==2.4.1
     # via beautifulsoup4
 sqlalchemy==2.0.19
     # via langchain
+st-oauth @ git+https://github.com/dulacp/st_oauth.git@52afffa22b00637b9b2199eaeddce449efbf044f
+    # via -r requirements.in
 streamlit==1.24.0
     # via
     #   -r requirements.in
+    #   st-oauth
     #   streamlit-elements
     #   streamlit-lottie
 streamlit-elements==0.1.0

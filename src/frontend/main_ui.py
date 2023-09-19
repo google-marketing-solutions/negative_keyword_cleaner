@@ -31,10 +31,12 @@ from openai.error import OpenAIError
 import pandas as pd
 import streamlit as st
 from streamlit_elements import dashboard, elements, lazy, mui
+from st_oauth import st_oauth
 import yaml
 
 from .components.sidebar import display_sidebar_component
 from . import models
+from utils import auth
 from utils.keyword_helper import KeywordHelper
 
 logging.getLogger().setLevel(logging.DEBUG)
@@ -47,12 +49,10 @@ SCHEMA_EVALUATIONS = {
     "bad keyword": models.KeywordEvaluation(
         "bad keyword",
         decision=models.ScoreDecision.KEEP,
-        #category=models.ScoreCategory.BRAND_SAFETY,
-        reason="Keep as a negative for brand safety reasons"),
+        reason="Keep as a negative, not relevant"),
     "good keyword": models.KeywordEvaluation(
         "good keyword",
         decision=models.ScoreDecision.REMOVE,
-        #category=models.ScoreCategory.OTHER,
         reason="It is safe to target this keyword"),
 }
 
@@ -62,6 +62,8 @@ DEBUG_SCORING_LIMIT = 500  # No limit: -1
 
 
 def display_page():
+  auth.authenticate_user()
+
   st.header("AI Student — for Google Ads Neg Keywords")
   st.info("Hi, I am your AI student ready to learn from your client to clean their negative keywords. Let's dive in.", icon="🎓")
 
@@ -358,23 +360,18 @@ def display_page():
       scoring_llm = FakeListLLM(responses=[
           textwrap.dedent("""\
               - keyword: taille coffre renault arkana
-                category: brand-safety
                 reason: It is safe to target this keyword as it is related to a Renault product
                 decision: remove
               - keyword: "location v\xE9hicule utilitaire"
-                category: other
                 reason: Can target this generic query
                 decision: remove
               - keyword: acheter une renault captur hybride
-                category: other
                 reason: Safe to target hybrid models
                 decision: remove
               - keyword: accessoires renault trafic
-                category: other
                 reason: We don't want to sell accessories
                 decision: keep
               - keyword: essai citadine
-                category: other
                 reason: Safe to target generic model queries
                 decision: remove
               """)

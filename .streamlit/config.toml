@@ -1,0 +1,20 @@
+[server]
+headless = true
+runOnSave = false
+fileWatcherType = "poll"
+enableCORS = true
+enableXsrfProtection = false
+port = 8080
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+primaryColor="#F63366"
+backgroundColor="#FFFFFF"
+secondaryBackgroundColor="#F0F2F6"
+textColor="#262730"
+font="sans serif"
+
+[logger]
+level = "debug"

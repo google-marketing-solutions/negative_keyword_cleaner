@@ -23,6 +23,7 @@ from gaarf.query_executor import AdsReportFetcher, GaarfReport
 from gaarf.report import GaarfRow
 from google.api_core import exceptions
 
+from utils import auth
 from utils.config import Config
 from utils.gaarf_queries import AdgroupNegativeKeywords, CampaignNegativeKeywords, KeywordLevel
 
@@ -108,7 +109,14 @@ class KeywordHelper:
     def __init__(self, config:Config):
         # Expand the mcc account to child accounts to initialize the report fetcher
         googleads_api_client = GoogleAdsApiClient(
-            config_dict=config.__dict__,
+            config_dict={
+                'developer_token': config.developer_token,
+                'login_customer_id': config.login_customer_id,
+                'use_proto_plus': config.use_proto_plus,
+                'client_id': auth.OAUTH_CLIENT_ID,
+                'client_secret': auth.OAUTH_CLIENT_SECRET,
+                'refresh_token': auth.get_access_token(),
+            },
             version=_GOOGLE_ADS_API_VERSION)
         try:
             customer_ids = get_customer_ids(
