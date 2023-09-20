@@ -1,6 +1,5 @@
 .gcloudignore
 
-.streamlit
 .venv
 .vscode
 

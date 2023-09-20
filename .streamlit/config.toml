@@ -4,6 +4,7 @@ runOnSave = false
 fileWatcherType = "poll"
 enableCORS = true
 enableXsrfProtection = false
+enableWebsocketCompression = false
 port = 8080
 
 [browser]

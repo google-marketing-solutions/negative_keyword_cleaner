@@ -12,10 +12,6 @@ variable "appengine_location" {
   default = "europe-west"
 }
 
-variable "user_email" {
-  type = string
-}
-
 variable "google_oauth_client_id" {
   description = "Google OAuth Client Id"
 }

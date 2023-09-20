@@ -15,6 +15,17 @@
 import os
 from typing import Any, Dict
 
+try:
+    # Loads local env variables.
+    from dotenv import find_dotenv, load_dotenv
+    env_file = find_dotenv()
+    print("Found .env file:", env_file)
+    load_dotenv(env_file)
+except ImportError as err:
+    print("ImportError:", err)
+except Exception as err:
+    print(f"Failed to import local env variables: {err}")
+
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 import streamlit as st
@@ -29,34 +40,16 @@ REVOKE_TOKEN_URL = os.getenv('REVOKE_TOKEN_URL', 'https://accounts.google.com/o/
 JWKS_URI = os.getenv('JWKS_URI', 'https://www.googleapis.com/oauth2/v3/certs')
 OAUTH_CLIENT_ID = os.getenv('OAUTH_CLIENT_ID')
 OAUTH_CLIENT_SECRET = os.getenv('OAUTH_CLIENT_SECRET')
+OAUTH_REDIRECT_URI = os.getenv('OAUTH_REDIRECT_URI')
 
-# Retrieves the app url and configures the OAuth callback url.
-try:
-    # NOTE: locally we have access to Cloudflare Quick Tunnel domain on the /metrics endpoint.
-    # local_response = requests.get('http://localhost:8081/metrics')
-    # local_response.raise_for_status()
-    # st_base_url = re.compile(r'userHostname\="([^"]+)"').search()
-    st_base_url = "http://localhost:8080"
-except requests.ConnectionError as e:
-    session = st.runtime.get_instance()._session_mgr.list_active_sessions()[0]
-    st_base_url = urllib.parse.urlunparse(['https', session.client.request.host, '', '', '', ''])
-
-# REDIRECT_URI = os.path.join(st_base_url, 'component/streamlit_oauth.authorize_button/index.html')
-REDIRECT_URI = st_base_url
-SCOPES = ' '.join([
-    # Default scope
-    'https://www.googleapis.com/auth/userinfo.profile',
-    'https://www.googleapis.com/auth/userinfo.email',
-    # AdWords scope
-    'https://www.googleapis.com/auth/adwords',
-])
+print("OAUTH_REDIRECT_URI:", OAUTH_REDIRECT_URI)
 
 
 def authenticate_user():
     oauth2_params = {
         'authorization_endpoint': AUTHORIZE_URL,
         'token_endpoint': TOKEN_URL,
-        'redirect_uri': REDIRECT_URI,
+        'redirect_uri': OAUTH_REDIRECT_URI,
         'jwks_uri': JWKS_URI,
         'client_id': OAUTH_CLIENT_ID,
         'client_secret': OAUTH_CLIENT_SECRET,

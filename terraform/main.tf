@@ -2,9 +2,16 @@
 # Custom Service Account
 #
 
+resource "google_project_service" "iam" {
+  service = "iam.googleapis.com"
+  disable_dependent_services = false
+}
+
 resource "google_service_account" "main" {
   account_id   = "neg-keywords-cleaner"
   display_name = "Negative Keywords Cleaner Service Account"
+
+  depends_on = [google_project_service.iam]
 }
 
 resource "google_project_iam_member" "gae_api" {
@@ -25,9 +32,67 @@ resource "google_project_iam_member" "storage_reader" {
   member  = "serviceAccount:${google_service_account.main.email}"
 }
 
+resource "google_project_iam_member" "aiplatform_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.main.email}"
+}
+
+##
+# Vertex AI
+#
+
+resource "google_project_service" "aiplatform" {
+  service            = "aiplatform.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "apikeys" {
+  service            = "apikeys.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_apikeys_key" "vertexai" {
+  name         = "negcleaner-palm2"
+  display_name = "Negative Keywords Cleaner - PALM 2"
+  project      = var.project_id
+
+  restrictions {
+    api_targets {
+      service = "language.googleapis.com"
+    }
+  }
+
+  depends_on = [google_project_service.apikeys]
+}
+
+##
+# Google Ads
+#
+
+resource "google_project_service" "googleads" {
+  service            = "googleads.googleapis.com"
+  disable_on_destroy = false
+}
+
 ##
 # App Engine Deployment
 #
+
+resource "google_project_service" "appengine" {
+  service = "appengine.googleapis.com"
+  disable_dependent_services = false
+}
+
+resource "google_project_service" "appengineflex" {
+  service = "appengineflex.googleapis.com"
+  disable_dependent_services = false
+}
+
+resource "google_project_service" "cloudresourcemanager" {
+  service = "cloudresourcemanager.googleapis.com"
+  disable_dependent_services = false
+}
 
 resource "random_id" "bucket_main_suffix" {
   keepers = {
@@ -45,6 +110,8 @@ resource "google_storage_bucket" "main" {
   force_destroy = true
 
   uniform_bucket_level_access = true
+
+  depends_on = [google_project_service.cloudresourcemanager]
 }
 
 resource "google_storage_bucket_iam_member" "member" {
@@ -54,7 +121,7 @@ resource "google_storage_bucket_iam_member" "member" {
 }
 
 locals {
-  app_hostname = google_app_engine_application.main.default_hostname
+  app_hostname = "${google_app_engine_application.main.default_hostname}"
 }
 
 data "archive_file" "app" {
@@ -65,10 +132,9 @@ data "archive_file" "app" {
   excludes         = [
     ".venv",
     ".vscode",
-    ".streamlit",
     "terraform",
     "tests",
-    #"app_config.yaml",
+    "app_config.yaml",
   ]
 }
 
@@ -96,10 +162,12 @@ resource "google_project_service" "service" {
 resource "google_app_engine_application" "main" {
   project     = var.project_id
   location_id = var.appengine_location
+
+  depends_on = [google_project_service.appengine]
 }
 
 resource "google_app_engine_flexible_app_version" "negcleaner" {
-  version_id      = "negcleaner-v1"
+  version_id      = "v1"
   service         = "default"
   service_account = google_service_account.main.email
 
@@ -107,6 +175,9 @@ resource "google_app_engine_flexible_app_version" "negcleaner" {
   runtime         = "custom"
 
   deployment {
+    container {
+      image = ""  # HACK: to workaround the bug https://github.com/hashicorp/terraform-provider-google/issues/10185
+    }
     zip {
       source_url = "https://storage.googleapis.com/${google_storage_bucket_object.app_zip.bucket}/${google_storage_bucket_object.app_zip.name}"
     }
@@ -127,9 +198,10 @@ resource "google_app_engine_flexible_app_version" "negcleaner" {
 
   env_variables = {
     port = "8080"
-    OAUTH2_CLIENT_ID = var.google_oauth_client_id
-    OAUTH2_SECRET = var.google_oauth_client_secret
-    OAUTH_REDIRECT_URI = "https://${local.app_hostname}/component/streamlit_oauth.authorize_button/index.html"
+    OAUTH_CLIENT_ID = var.google_oauth_client_id
+    OAUTH_CLIENT_SECRET = var.google_oauth_client_secret
+    OAUTH_REDIRECT_URI = "https://${local.app_hostname}/"
+    GOOGLE_VERTEXAI_API_KEY = google_apikeys_key.vertexai.key_string
   }
 
   # handlers {
@@ -146,20 +218,26 @@ resource "google_app_engine_flexible_app_version" "negcleaner" {
 
   automatic_scaling {
     cool_down_period = "120s"
+    min_total_instances = 1
+    max_total_instances = 1
+
     cpu_utilization {
       target_utilization = 0.5
     }
   }
+
+  noop_on_destroy = true
+  depends_on = [google_project_service.appengineflex]
 }
 
-resource "google_app_engine_service_split_traffic" "main" {
-  service = google_app_engine_flexible_app_version.negcleaner.service
+# resource "google_app_engine_service_split_traffic" "main" {
+#   service = google_app_engine_flexible_app_version.negcleaner.service
 
-  migrate_traffic = false
-  split {
-    shard_by = "IP"
-    allocations = {
-      (google_app_engine_flexible_app_version.negcleaner.version_id) = 1.0
-    }
-  }
-}
+#   migrate_traffic = false
+#   split {
+#     shard_by = "UNSPECIFIED"
+#     allocations = {
+#       (google_app_engine_flexible_app_version.negcleaner.version_id) = 1.0
+#     }
+#   }
+# }

@@ -28,6 +28,9 @@ GCS_CONFIG_FILE = 'neg_cleaner/app_config.yaml'
 # GCS client
 DEFAULT_BUCKET_NAME = os.getenv('DEFAULT_BUCKET_NAME')
 
+# Default Google Vertex AI key
+GOOGLE_VERTEXAI_API_KEY = os.getenv('GOOGLE_VERTEXAI_API_KEY', '')
+
 
 def is_appengine():
     return os.getenv('RUNNING_ON_GAE') is not None
@@ -50,7 +53,7 @@ class Config:
 
     # LLM platform API keys
     openai_api_key: str = ''
-    google_api_key: str = ''
+    google_api_key: str = GOOGLE_VERTEXAI_API_KEY
 
     @classmethod
     def from_disk(cls, config_path=None):

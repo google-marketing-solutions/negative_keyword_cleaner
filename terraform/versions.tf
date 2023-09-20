@@ -11,7 +11,7 @@ terraform {
 
     google = {
       source = "hashicorp/google"
-      version = "4.82.0"
+      version = "4.83.0"
     }
 
     random = {
@@ -24,4 +24,6 @@ terraform {
 provider "google" {
   project = var.project_id
   region  = var.region
+
+  user_project_override = true
 }

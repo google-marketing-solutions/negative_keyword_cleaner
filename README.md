@@ -10,6 +10,7 @@ Create a test client for local development:
     # Copy the OAuth2.0 Client Id and Client Secret in `.env`
     echo "OAUTH_CLIENT_ID=xxx" > .env
     echo "OAUTH_CLIENT_SECRET=yyy" >> .env
+    echo "OAUTH_REDIRECT_URI=http://localhost:8080" >> .env
 
 Using a standard virtualenv:
 
@@ -33,6 +34,10 @@ Open CloudShell on your GCP
 
     git clone .../neg-keywords-cleaner.git
     cd neg-keywords-cleaner/terraform/
+
+    export TF_VAR_project_id=$(gcloud config list --format 'value(core.project)')
+    export TF_VAR_google_oauth_client_id=...
+    export TF_VAR_google_oauth_client_secret=...
 
     # Deploys the solution.
     terraform init -upgrade

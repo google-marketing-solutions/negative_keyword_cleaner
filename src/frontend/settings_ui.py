@@ -23,7 +23,7 @@ import streamlit as st
 
 import frontend.helper as st_helper
 from utils import auth
-from utils.config import Config
+from utils.config import is_appengine, Config
 
 logger = logging.getLogger("streamlit")
 
@@ -76,7 +76,7 @@ def update_config(updating_config):
 
 
 def save_ads_config(config):
-    config.login_customer_id = int(
+    config.login_customer_id = str(
         st.session_state.login_customer_id.replace('-', ''))
     config.developer_token = st.session_state.developer_token
     save_config(config)
