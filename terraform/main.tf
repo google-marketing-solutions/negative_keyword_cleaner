@@ -1,10 +1,16 @@
+resource "google_project_service" "cloudresourcemanager" {
+  service = "cloudresourcemanager.googleapis.com"
+  disable_dependent_services = true
+}
+
 ##
 # Custom Service Account
 #
 
 resource "google_project_service" "iam" {
-  service = "iam.googleapis.com"
-  disable_dependent_services = false
+  service            = "iam.googleapis.com"
+  disable_on_destroy = false
+  depends_on         = [google_project_service.cloudresourcemanager]
 }
 
 resource "google_service_account" "main" {
@@ -45,15 +51,21 @@ resource "google_project_iam_member" "aiplatform_user" {
 resource "google_project_service" "aiplatform" {
   service            = "aiplatform.googleapis.com"
   disable_on_destroy = false
+  depends_on         = [google_project_service.cloudresourcemanager]
 }
 
 resource "google_project_service" "apikeys" {
   service            = "apikeys.googleapis.com"
   disable_on_destroy = false
+  depends_on         = [google_project_service.cloudresourcemanager]
+}
+
+resource "random_id" "vertexai_apikey_suffix" {
+  byte_length = 8
 }
 
 resource "google_apikeys_key" "vertexai" {
-  name         = "negcleaner-palm2"
+  name         = "negcleaner-palm2-${random_id.vertexai_apikey_suffix.hex}"
   display_name = "Negative Keywords Cleaner - PALM 2"
   project      = var.project_id
 
@@ -73,25 +85,31 @@ resource "google_apikeys_key" "vertexai" {
 resource "google_project_service" "googleads" {
   service            = "googleads.googleapis.com"
   disable_on_destroy = false
+  depends_on         = [google_project_service.cloudresourcemanager]
 }
 
 ##
 # App Engine Deployment
 #
 
+data "google_app_engine_default_service_account" "default" {}
+
+resource "google_project_iam_member" "appspot_storage_reader" {
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
+  member  = "serviceAccount:${google_app_engine_default_service_account.default.email}"
+}
+
 resource "google_project_service" "appengine" {
   service = "appengine.googleapis.com"
-  disable_dependent_services = false
+  disable_on_destroy = false
+  depends_on         = [google_project_service.cloudresourcemanager]
 }
 
 resource "google_project_service" "appengineflex" {
   service = "appengineflex.googleapis.com"
-  disable_dependent_services = false
-}
-
-resource "google_project_service" "cloudresourcemanager" {
-  service = "cloudresourcemanager.googleapis.com"
-  disable_dependent_services = false
+  disable_on_destroy = false
+  depends_on         = [google_project_service.cloudresourcemanager]
 }
 
 resource "random_id" "bucket_main_suffix" {
@@ -155,8 +173,8 @@ resource "google_storage_bucket_object" "app_zip" {
 }
 
 resource "google_project_service" "service" {
-  service = "appengineflex.googleapis.com"
-  disable_dependent_services = false
+  service            = "appengineflex.googleapis.com"
+  disable_on_destroy = false
 }
 
 resource "google_app_engine_application" "main" {
