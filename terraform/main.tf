@@ -92,14 +92,6 @@ resource "google_project_service" "googleads" {
 # App Engine Deployment
 #
 
-data "google_app_engine_default_service_account" "default" {}
-
-resource "google_project_iam_member" "appspot_storage_reader" {
-  project = var.project_id
-  role    = "roles/storage.objectViewer"
-  member  = "serviceAccount:${google_app_engine_default_service_account.default.email}"
-}
-
 resource "google_project_service" "appengine" {
   service = "appengine.googleapis.com"
   disable_on_destroy = false
@@ -110,6 +102,16 @@ resource "google_project_service" "appengineflex" {
   service = "appengineflex.googleapis.com"
   disable_on_destroy = false
   depends_on         = [google_project_service.cloudresourcemanager]
+}
+
+data "google_app_engine_default_service_account" "default" {
+    depends_on = [google_app_engine_flexible_app_version.negcleaner]
+}
+
+resource "google_project_iam_member" "appspot_storage_reader" {
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
+  member  = "serviceAccount:${data.google_app_engine_default_service_account.default.email}"
 }
 
 resource "random_id" "bucket_main_suffix" {
@@ -170,11 +172,6 @@ resource "google_storage_bucket_object" "app_zip" {
  source       = data.archive_file.app.output_path
  content_type = "text/plain"
  bucket       = google_storage_bucket.deployments.id
-}
-
-resource "google_project_service" "service" {
-  service            = "appengineflex.googleapis.com"
-  disable_on_destroy = false
 }
 
 resource "google_app_engine_application" "main" {
