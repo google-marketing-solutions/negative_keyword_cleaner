@@ -1,6 +1,30 @@
 # AI Student for Negative Keywords
 
-## Run the app
+## Deploy
+
+Open CloudShell on your GCP
+
+    git clone .../neg-keywords-cleaner.git
+    cd neg-keywords-cleaner/terraform/
+
+    echo 'google_oauth_client_id = "..."' > secrets.tfvars
+    echo 'google_oauth_client_secret = "..."' >> secrets.tfvars
+
+    export TF_VAR_project_id=$(gcloud config list --format 'value(core.project)')
+
+    # Deploys the solution.
+    terraform init -upgrade
+    terraform apply -var-file secrets.tfvars
+
+    > App URL: https://myapp.appspot.com
+
+## Uninstall
+
+You can remove all GCP resources with one command:
+
+    terraform destroy
+
+## Run the app on a local machine
 
 Create a test client for local development:
 
@@ -26,27 +50,4 @@ Using a standard virtualenv:
     (.venv) pip install python-dotenv
 
     # Runs the streamlit server
-    (.venv) streamlit run src/AI_student.py
-
-## Deploy
-
-Open CloudShell on your GCP
-
-    git clone .../neg-keywords-cleaner.git
-    cd neg-keywords-cleaner/terraform/
-
-    export TF_VAR_project_id=$(gcloud config list --format 'value(core.project)')
-    export TF_VAR_google_oauth_client_id=...
-    export TF_VAR_google_oauth_client_secret=...
-
-    # Deploys the solution.
-    terraform init -upgrade
-    terraform apply
-
-    > App URL: https://myapp.appspot.com
-
-## Uninstall
-
-You can remove all GCP resources with one command:
-
-    terraform destroy
+    (.venv) streamlit run --server.headless=false src/AI_student.py

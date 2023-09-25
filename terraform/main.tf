@@ -1,6 +1,6 @@
 resource "google_project_service" "cloudresourcemanager" {
   service = "cloudresourcemanager.googleapis.com"
-  disable_dependent_services = true
+  disable_on_destroy = false
 }
 
 ##
