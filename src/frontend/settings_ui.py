@@ -35,6 +35,9 @@ DEV_TOKEN_HELP = """Refer to
     [How to obtain a developer token](https://developers.google.com/google-ads/api/docs/first-call/dev-token#:~:text=A%20developer%20token%20from%20Google,SETTINGS%20%3E%20SETUP%20%3E%20API%20Center.)
     for more information"""
 
+GOOGLE_ADS_HELP = """Google Ads MCC account ID. You can set 
+    it both with or without hyphens (ie. XXX-XXX-XXXX)"""
+
 
 def validate_setup():
     config = st.session_state.config
@@ -123,7 +126,7 @@ def display_page():
                 value=st_helper.display(config.login_customer_id),
                 key="login_customer_id",
                 disabled= not modify_ads_config,
-                help="Google Ads MCC account ID")
+                help="Google Ads MCC account ID. You can set it both with or without hyphens XXX-XXX-XXXX")
             st.text_input(
                 "Google Ads API Developer Token",
                 value=st_helper.display(config.developer_token),

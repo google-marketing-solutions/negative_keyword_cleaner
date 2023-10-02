@@ -54,7 +54,9 @@ def get_customer_ids(ads_client: GoogleAdsApiClient,
     # Fetches ENABLED and CANCELED accounts.
     query = """
     SELECT customer_client.id FROM customer_client
-    WHERE customer_client.manager = FALSE
+    WHERE customer_client.manager = FALSE AND
+    customer_client.status = 'ENABLED' AND
+    customer.status = 'ENABLED' 
     """
     query_specification = QuerySpecification(query).generate()
     if not isinstance(customer_id, MutableSequence):
@@ -130,6 +132,7 @@ class KeywordHelper:
             return None
 
     def get_neg_keywords(self) -> GaarfReport:
+        print(AdgroupNegativeKeywords())
         adgroup_neg_kws = self.report_fetcher.fetch(AdgroupNegativeKeywords())
         campaign_neg_kws = self.report_fetcher.fetch(CampaignNegativeKeywords())
         return adgroup_neg_kws + campaign_neg_kws

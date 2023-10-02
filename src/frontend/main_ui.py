@@ -17,6 +17,7 @@ import dataclasses
 import json
 import logging
 import os
+import re
 import pickle
 import random
 import textwrap
@@ -43,7 +44,7 @@ logging.getLogger().setLevel(logging.DEBUG)
 logger = logging.Logger(__name__)
 
 
-SAMPLE_BATCH_SIZE = 5
+SAMPLE_BATCH_SIZE = 10
 
 SCHEMA_EVALUATIONS = {
     "bad keyword": models.KeywordEvaluation(
@@ -59,6 +60,8 @@ SCHEMA_EVALUATIONS = {
 DEBUG_SUMMARY = False
 DEBUG_SCORING = False
 DEBUG_SCORING_LIMIT = 500  # No limit: -1
+
+URL_REGEX = r"^((http|https)://)[-a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)$"
 
 
 def display_page():
@@ -114,6 +117,10 @@ def display_page():
       st.stop()
     else:
       st.session_state.company_homepage_url = company_homepage_url
+
+    if len(company_homepage_url) > 0: 
+      if not re.match(URL_REGEX, company_homepage_url):
+         st.error("Invalid URL") 
 
     with st.spinner("I'm browsing their website..."):
       homepage_docs = models.fetch_landing_page_text(company_homepage_url)
