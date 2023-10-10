@@ -80,11 +80,12 @@ def get_customer_ids(ads_client: GoogleAdsApiClient,
 
 class Keyword:
     def __init__(
-        self, criterion_id:str, keyword:str, is_negative:bool,
-        match_type:MatchType, level:KeywordLevel, adgroup_id:int,
-        adgroup_name:str, campaign_id:int, campaign_name:str, account_id:int,
-        account_name:str):
+        self, criterion_id:str, original_keyword:str, keyword:str, 
+        is_negative:bool, match_type:MatchType, level:KeywordLevel, 
+        adgroup_id:int, adgroup_name:str, campaign_id:int, 
+        campaign_name:str, account_id:int, account_name:str):
         self.criterion_id = criterion_id
+        self.original_kw_text = keyword
         self.kw_text = keyword
         self.is_negative = is_negative
         self.match_type = match_type
@@ -141,7 +142,7 @@ class KeywordHelper:
         all_keywords = {}
         for kw in raw_keyword_data:
             keyword_obj = Keyword(
-                kw.criterion_id, kw.keyword, kw.is_negative, kw.match_type,
+                kw.criterion_id, kw.keyword, kw.keyword, kw.is_negative, kw.match_type,
                 kw.level, kw.adgroup_id, kw.adgroup_name, kw.campaign_id,
                 kw.campaign_name, kw.account_id, kw.account_name)
             clean_kw = keyword_obj.get_clean_keyword_text()

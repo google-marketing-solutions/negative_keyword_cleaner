@@ -97,7 +97,7 @@ class ScoreDecision(enum.StrEnum):
 class ScoreCategory(enum.StrEnum):
     UNKNOWN = "unknown"
     COMPETITOR = "competitor"
-    BRAND_SAFETY = "brand-safety"
+    BRAND_SAFETY = "brand safety"
     MISSPELLING = "misspelling"
     OTHER = "other"
 

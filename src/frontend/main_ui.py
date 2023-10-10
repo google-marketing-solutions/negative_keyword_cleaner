@@ -43,7 +43,6 @@ from utils.keyword_helper import KeywordHelper
 logging.getLogger().setLevel(logging.DEBUG)
 logger = logging.Logger(__name__)
 
-
 SAMPLE_BATCH_SIZE = 10
 
 SCHEMA_EVALUATIONS = {

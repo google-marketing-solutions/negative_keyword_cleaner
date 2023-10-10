@@ -384,7 +384,7 @@ sqlalchemy==2.0.19
     # via langchain
 st-oauth @ git+https://github.com/dulacp/st_oauth.git@52afffa22b00637b9b2199eaeddce449efbf044f
     # via -r requirements.in
-streamlit==1.24.0
+streamlit==1.27.2
     # via
     #   -r requirements.in
     #   st-oauth
