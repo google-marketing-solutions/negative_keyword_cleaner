@@ -85,7 +85,7 @@ class Keyword:
         adgroup_id:int, adgroup_name:str, campaign_id:int, 
         campaign_name:str, account_id:int, account_name:str):
         self.criterion_id = criterion_id
-        self.original_kw_text = keyword
+        self.original_kw_text = original_keyword
         self.kw_text = keyword
         self.is_negative = is_negative
         self.match_type = match_type
@@ -125,7 +125,6 @@ class KeywordHelper:
             customer_ids = get_customer_ids(
                 googleads_api_client,
                 config.login_customer_id)
-            print("customer_ids: ", customer_ids)
             self.report_fetcher = AdsReportFetcher(
                 googleads_api_client,
                 customer_ids)
@@ -133,7 +132,6 @@ class KeywordHelper:
             return None
 
     def get_neg_keywords(self) -> GaarfReport:
-        print(AdgroupNegativeKeywords())
         adgroup_neg_kws = self.report_fetcher.fetch(AdgroupNegativeKeywords())
         campaign_neg_kws = self.report_fetcher.fetch(CampaignNegativeKeywords())
         return adgroup_neg_kws + campaign_neg_kws
@@ -146,9 +144,9 @@ class KeywordHelper:
                 kw.level, kw.adgroup_id, kw.adgroup_name, kw.campaign_id,
                 kw.campaign_name, kw.account_id, kw.account_name)
             clean_kw = keyword_obj.get_clean_keyword_text()
+
             if clean_kw not in all_keywords:
                 all_keywords[clean_kw] = [keyword_obj]
             else:
                 all_keywords[clean_kw].append(keyword_obj)
-
         return all_keywords

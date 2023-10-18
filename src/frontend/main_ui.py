@@ -43,7 +43,8 @@ from utils.keyword_helper import KeywordHelper
 logging.getLogger().setLevel(logging.DEBUG)
 logger = logging.Logger(__name__)
 
-SAMPLE_BATCH_SIZE = 10
+
+SAMPLE_BATCH_SIZE = 15
 
 SCHEMA_EVALUATIONS = {
     "bad keyword": models.KeywordEvaluation(
@@ -170,7 +171,7 @@ def display_page():
   elif st.session_state.get('context_open'):
     st.session_state.context_open = False
     time.sleep(0.05)
-    st.experimental_rerun()
+    st.rerun()
 
 
   ##
@@ -189,12 +190,13 @@ def display_page():
         if not negative_kws_report:
             st.warning("No negative keywords found")
             st.stop()
-    #print("negative_kws_report:", negative_kws_report)
 
     negative_kws = kw_helper.clean_and_dedup(negative_kws_report)
     df = pd.DataFrame(
-        [(kw.get_clean_keyword_text(), kw.campaign_name, kw.campaign_id, kw.adgroup_id) for keywords in negative_kws.values() for kw in keywords],
-        columns=['keyword', 'campaign_name', 'campaign_id', 'adgroup_id']
+        [(kw.get_clean_keyword_text(), kw.kw_text, kw.campaign_name, kw.campaign_id, kw.adgroup_id) 
+        for keywords in negative_kws.values() 
+        for kw in keywords],
+        columns=['keyword', 'original_keyword', 'campaign_name', 'campaign_id', 'adgroup_id']
     )
     return df
 
@@ -342,7 +344,7 @@ def display_page():
 
         {company_segment}
 
-        Learn from these examples scored by an expert, formatted as a yaml output, especially learn from the reason column:
+        Learn from these examples scored by an expert, formatted as YAML output, especially learn from the reason column:
 
         {facts_segment}
 
@@ -353,7 +355,7 @@ def display_page():
         The decision to keep a keyword means that this keyword should be excluded from targeting.
         The decision to remove a keyword means that we want to target this keyword.
 
-        Given this context and examples, score this new list of keywords with relevancy and add a detailed reason why you scored that way inspired by the reason used in our examples above:
+        Given this context and examples, score this new list of keywords with relevancy and add a detailed reason why you scored that way inspired by the reason used in our examples above formatted as valid YAML output:
 
         {keywords_segment}
         """)
@@ -403,6 +405,7 @@ def display_page():
 
     scored_keywords = st.session_state.get("scored_keywords", None)
     if not scored_keywords:
+      session_state.load_keywords_open = False
       with st.spinner("Scoring this batch of keywords..."):
         llm_chain = LLMChain(prompt=prompt, llm=scoring_llm, verbose=True)
         try:
@@ -556,7 +559,7 @@ def display_page():
                 with mui.TableCell(component="th", scope="row", sx={'p': 0}):
                   mui.Chip(label="AI Reason")
                 with mui.TableCell():
-                  mui.Typography(item.reason or "Empty")
+                  mui.Typography(item.reason or "Empty", paragraph=True)
           with mui.CardActions(disableSpacing=True, sx={"margin-top": "auto"}):
             mui.Button("Disagree with Student", color="error", onClick=define_handler_scoring(item, human_agree_with_llm=False), sx={"margin-right": "auto"})
             mui.Button("Agree with Student", color="success", onClick=define_handler_scoring(item, human_agree_with_llm=True))
@@ -635,11 +638,28 @@ def display_page():
     #     keyword_scored.append(kw)
     # df_output = df_filtered.query("keyword in @keyword_scored")
     formatted_evals = [
-        {"keyword": kw, "human_decision": human_eval.decision, "human_reason": human_eval.reason}
+        {
+            "keyword": kw,
+            "original_keyword": df_filtered.loc[df_filtered['keyword'] == kw, 'original_keyword'].values[0],
+            "human_decision": human_eval.decision,
+            "human_reason": human_eval.reason,
+            "campaign_name": df_filtered.loc[df_filtered['keyword'] == kw, 'campaign_name'].values[0],
+            "campaign_id": df_filtered.loc[df_filtered['keyword'] == kw, 'campaign_id'].values[0],
+            "adgroup_id": df_filtered.loc[df_filtered['keyword'] == kw, 'adgroup_id'].values[0]
+        }
         for kw, human_eval in evaluations.items()
+        if kw in df_filtered['keyword'].values
     ]
     df_output = pd.DataFrame(formatted_evals)
-    st.dataframe(df_output, height=200)
+
+    st.dataframe(
+      df_output,
+      height=200,
+      column_config={
+        "campaign_id": st.column_config.TextColumn("campaign_id"),
+        "adgroup_id": st.column_config.TextColumn("adgroup_id")
+    })
+
     st.download_button(
         "Download fine-tuning examples", df_output.to_csv(index=False), file_name="negative_keywords_used_to_train_student.csv")
 
@@ -723,8 +743,19 @@ def display_page():
 
     # Prepares the keywords to remove for download.
     formatted_evals_to_remove = [
-        {"keyword": student_eval.keyword, "student_decision": student_eval.decision, "student_reason": student_eval.reason}
-        for student_eval in cached_scoring_kws_evals if student_eval.decision == models.ScoreDecision.REMOVE
+        {
+            "keyword": student_eval.keyword,
+            "student_decision": student_eval.decision,
+            "student_reason": student_eval.reason,
+            "original_keyword": df_entry.original_keyword,
+            "campaign_name": df_entry.campaign_name,
+            "campaign_id": df_entry.campaign_id,
+            "adgroup_id": df_entry.adgroup_id,
+        }
+        for student_eval in cached_scoring_kws_evals
+        if student_eval.decision == models.ScoreDecision.REMOVE
+        for df_entry in df_filtered.itertuples()
+        if df_entry.keyword == student_eval.keyword
     ]
     formatted_evals_to_keep = [
         {"keyword": student_eval.keyword, "student_decision": student_eval.decision, "student_reason": student_eval.reason}

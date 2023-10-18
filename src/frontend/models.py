@@ -62,7 +62,7 @@ def render_custom_spinner_animation():
 def fetch_landing_page_text(url: str) -> list[Document]:
     """Fetches the visible text from a landing page url."""
     html_content = requests.get(url).text
-    soup = BeautifulSoup(html_content)
+    soup = BeautifulSoup(html_content, features="html.parser")
     texts = soup.find_all(text=True)
     content = "\n".join(str(t).strip() for t in texts if t.parent.name not in HTML_EXCLUDE_TAGS).strip()
     metadata = {
@@ -141,7 +141,7 @@ class KeywordEvaluation:
     @classmethod
     def from_dict(cls, data: dict[str, str]):
         return cls(
-            keyword=data["keyword"],
+            keyword=data.get("keyword", data.get("Keyword")),
             decision=ScoreDecision(data.get("decision", ScoreDecision.UNKNOWN.value)),
             #category=ScoreCategory(data.get("category", ScoreCategory.UNKNOWN.value)),
             #category=ScoreCategory.UNKNOWN.value,

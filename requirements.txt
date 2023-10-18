@@ -120,7 +120,7 @@ google-auth-oauthlib==1.0.0
     # via
     #   -r requirements.in
     #   google-ads
-google-cloud-aiplatform==1.28.1
+google-cloud-aiplatform==1.35.0
     # via -r requirements.in
 google-cloud-bigquery==3.11.4
     # via
@@ -195,9 +195,9 @@ jsonschema-specifications==2023.7.1
     # via jsonschema
 kiwisolver==1.4.4
     # via matplotlib
-langchain==0.0.244
+langchain==0.0.312
     # via -r requirements.in
-langsmith==0.0.14
+langsmith==0.0.43
     # via langchain
 markdown-it-py==3.0.0
     # via rich
