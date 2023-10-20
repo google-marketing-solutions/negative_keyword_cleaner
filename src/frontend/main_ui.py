@@ -112,15 +112,16 @@ def display_page():
         value="https://nike.com" if DEBUG_SUMMARY else st.session_state.get("company_homepage_url", ""),
     )
     if not company_homepage_url:
-      st.info("Once I have their website url, I can directly read and understand "
+      st.info("Once I have their website URL, I can directly read and understand "
               "who is this customer", icon="🎓")
       st.stop()
     else:
       st.session_state.company_homepage_url = company_homepage_url
 
-    if len(company_homepage_url) > 0: 
+    if len(company_homepage_url) > 0:
       if not re.match(URL_REGEX, company_homepage_url):
-         st.error("Invalid URL") 
+         st.error("Invalid URL")
+         st.stop()
 
     with st.spinner("I'm browsing their website..."):
       homepage_docs = models.fetch_landing_page_text(company_homepage_url)
@@ -405,7 +406,6 @@ def display_page():
 
     scored_keywords = st.session_state.get("scored_keywords", None)
     if not scored_keywords:
-      session_state.load_keywords_open = False
       with st.spinner("Scoring this batch of keywords..."):
         llm_chain = LLMChain(prompt=prompt, llm=scoring_llm, verbose=True)
         try:
@@ -554,7 +554,7 @@ def display_page():
                 with mui.TableCell(component="th", scope="row", sx={'p': 0}):
                   mui.Chip(label=f"{len(kw_campaigns)} Campaign{'s' if len(kw_campaigns) > 1 else ''}")
                 with mui.TableCell():
-                  mui.Typography(",".join(kw_campaigns))
+                  mui.Typography(",".join(kw_campaigns), noWrap=True)
               with mui.TableRow(sx={'&:last-child td, &:last-child th': { 'border': 0 } }):
                 with mui.TableCell(component="th", scope="row", sx={'p': 0}):
                   mui.Chip(label="AI Reason")
@@ -758,17 +758,38 @@ def display_page():
         if df_entry.keyword == student_eval.keyword
     ]
     formatted_evals_to_keep = [
-        {"keyword": student_eval.keyword, "student_decision": student_eval.decision, "student_reason": student_eval.reason}
-        for student_eval in cached_scoring_kws_evals if student_eval.decision == models.ScoreDecision.KEEP
+        {"keyword": student_eval.keyword,
+         "original_keyword": df_filtered.loc[df_filtered['keyword'] == student_eval.keyword, 'original_keyword'].values[0],
+         "student_decision": student_eval.decision,
+         "student_reason": student_eval.reason,
+         "campaign_name": df_filtered.loc[df_filtered['keyword'] == student_eval.keyword, 'campaign_name'].values[0],
+         "campaign_id": df_filtered.loc[df_filtered['keyword'] == student_eval.keyword, 'campaign_id'].values[0],
+         "adgroup_id": df_filtered.loc[df_filtered['keyword'] == student_eval.keyword, 'adgroup_id'].values[0]
+        }
+        for student_eval in cached_scoring_kws_evals
+        if student_eval.decision == models.ScoreDecision.KEEP
     ]
+
     df_to_remove = pd.DataFrame(formatted_evals_to_remove)
     df_to_keep = pd.DataFrame(formatted_evals_to_keep)
-    st.dataframe(df_to_remove, height=200)
+    st.dataframe(
+      df_to_remove,
+      height=200,
+      column_config={
+        "campaign_id": st.column_config.TextColumn("campaign_id"),
+        "adgroup_id": st.column_config.TextColumn("adgroup_id")
+    })
     st.download_button(
         "Download keywords to remove found by Student",
         df_to_remove.to_csv(index=False), file_name="negative_keywords_to_remove.csv"
     )
-    st.dataframe(df_to_keep, height=200)
+    st.dataframe(
+      df_to_keep,
+      height=200,
+      column_config={
+        "campaign_id": st.column_config.TextColumn("campaign_id"),
+        "adgroup_id": st.column_config.TextColumn("adgroup_id")
+    })
     st.download_button(
         "Download keywords to keep with reason written by Student",
         df_to_keep.to_csv(index=False), file_name="negative_keywords_to_keep.csv"

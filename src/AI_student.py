@@ -22,7 +22,7 @@ from frontend import main_ui
 st.set_page_config(
     page_title="AI Student",
     page_icon="🎓",
-    layout="centered"
+    layout="wide"
 )
 
 st_helper.initialize_session_state()

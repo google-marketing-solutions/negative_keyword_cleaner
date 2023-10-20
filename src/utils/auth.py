@@ -57,7 +57,7 @@ def authenticate_user():
         'audience': OAUTH_CLIENT_ID,
         'identity_field_in_token': 'sub',
     }
-    st_oauth(oauth2_params)
+    st_oauth(oauth2_params, label="Login with Google")
 
 
 def get_access_token():
