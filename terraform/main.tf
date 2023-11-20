@@ -1,23 +1,18 @@
-resource "google_project_service" "cloudresourcemanager" {
-  service = "cloudresourcemanager.googleapis.com"
-  disable_on_destroy = false
+resource "null_resource" "enable_cloud_apis" {
+  provisioner "local-exec" {
+    command = "gcloud services enable serviceusage.googleapis.com cloudresourcemanager.googleapis.com iam.googleapis.com --project ${var.project_id}"
+  }
 }
 
 ##
 # Custom Service Account
 #
 
-resource "google_project_service" "iam" {
-  service            = "iam.googleapis.com"
-  disable_on_destroy = false
-  depends_on         = [google_project_service.cloudresourcemanager]
-}
-
 resource "google_service_account" "main" {
   account_id   = "neg-keywords-cleaner"
   display_name = "Negative Keywords Cleaner Service Account"
 
-  depends_on = [google_project_service.iam]
+  depends_on = [null_resource.enable_cloud_apis]
 }
 
 resource "google_project_iam_member" "logs_writer" {
@@ -39,13 +34,13 @@ resource "google_project_iam_member" "aiplatform_user" {
 resource "google_project_service" "aiplatform" {
   service            = "aiplatform.googleapis.com"
   disable_on_destroy = false
-  depends_on         = [google_project_service.cloudresourcemanager]
+  depends_on         = [null_resource.enable_cloud_apis]
 }
 
 resource "google_project_service" "apikeys" {
   service            = "apikeys.googleapis.com"
   disable_on_destroy = false
-  depends_on         = [google_project_service.cloudresourcemanager]
+  depends_on         = [null_resource.enable_cloud_apis]
 }
 
 resource "random_id" "vertexai_apikey_suffix" {
@@ -73,7 +68,7 @@ resource "google_apikeys_key" "vertexai" {
 resource "google_project_service" "googleads" {
   service            = "googleads.googleapis.com"
   disable_on_destroy = false
-  depends_on         = [google_project_service.cloudresourcemanager]
+  depends_on         = [null_resource.enable_cloud_apis]
 }
 
 ##
@@ -83,17 +78,18 @@ resource "google_project_service" "googleads" {
 resource "google_project_service" "cloud_run" {
   service = "run.googleapis.com"
   disable_on_destroy = false
-  depends_on         = [google_project_service.cloudresourcemanager]
+  depends_on         = [null_resource.enable_cloud_apis]
 }
 
 resource "google_cloud_run_v2_service" "default" {
   name     = "neg-kws-cleaner"
-  location = "europe-west1"
+  location = var.location
+  project = var.project_id
   ingress = "INGRESS_TRAFFIC_ALL"
 
   template {
     containers {
-      image = "gcr.io/${var.project_id}/negatives:v2"
+      image = "gcr.io/${var.project_id}/negatives:v1"
 
       env {
         name = "port"
@@ -114,13 +110,37 @@ resource "google_cloud_run_v2_service" "default" {
         name = "GOOGLE_VERTEXAI_API_KEY"
         value = google_apikeys_key.vertexai.key_string
       }
+      resources {
+        limits = {
+            cpu = "2"
+            memory = "8Gi"
+        }
+      }
     }
+    session_affinity = true
   }
 
   traffic {
     type = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
     percent = 100
   }
+}
+
+data "google_iam_policy" "noauth" {
+  binding {
+    role = "roles/run.invoker"
+    members = [
+      "allUsers",
+    ]
+  }
+}
+
+resource "google_cloud_run_v2_service_iam_policy" "policy" {
+  project = var.project_id
+  location = var.location
+  name = google_cloud_run_v2_service.default.name
+
+  policy_data = data.google_iam_policy.noauth.policy_data
 }
 
 resource "null_resource" "env_var_update" {

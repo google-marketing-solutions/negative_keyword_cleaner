@@ -1,8 +1,4 @@
 terraform {
-  # backend {
-  #   gcs = "gs://"
-  # }
-
   required_providers {
     archive = {
       source = "hashicorp/archive"
@@ -23,7 +19,7 @@ terraform {
 
 provider "google" {
   project = var.project_id
-  region  = var.region
+  region  = var.location
 
   user_project_override = true
 }

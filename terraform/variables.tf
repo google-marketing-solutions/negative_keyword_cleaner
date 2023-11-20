@@ -2,14 +2,9 @@ variable "project_id" {
   type = string
 }
 
-variable "region" {
+variable "location" {
   type = string
   default = "europe-west1"
-}
-
-variable "appengine_location" {
-  type = string
-  default = "europe-west"
 }
 
 variable "google_oauth_client_id" {
