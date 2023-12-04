@@ -25,6 +25,9 @@ st.set_page_config(
     layout="wide"
 )
 
+with open('src/frontend/style/style.css') as f:
+    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
 st_helper.initialize_session_state()
 st_helper.customize_css()
 settings_ui.validate_setup()

@@ -11,7 +11,7 @@ def display_sidebar_component():
             # About
             Our AI Student aims at helping you maintain healthy negative keywords.
 
-            Please share your feedback or any suggestion with us 💡
+            Please share your feedback or any suggestion at negatives@google.com 💡
 
             _Made by Google Ads Professional Services_
 

@@ -61,14 +61,23 @@ def render_custom_spinner_animation():
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_landing_page_text(url: str) -> list[Document]:
     """Fetches the visible text from a landing page url."""
-    html_content = requests.get(url).text
-    soup = BeautifulSoup(html_content, features="html.parser")
-    texts = soup.find_all(text=True)
-    content = "\n".join(str(t).strip() for t in texts if t.parent.name not in HTML_EXCLUDE_TAGS).strip()
-    metadata = {
-        "title": soup.find("title").string,
-        "description": soup.find("meta", property="description", content=True),
-    }
+    try:
+        html_content = requests.get(url).text
+        logger.info(html_content)
+        soup = BeautifulSoup(html_content, features="html.parser")
+        texts = soup.find_all(text=True)
+        content = "\n".join(str(t).strip() for t in texts if t.parent.name not in HTML_EXCLUDE_TAGS).strip()
+        metadata = {
+            "title": soup.find("title").string,
+            "description": soup.find("meta", property="description", content=True),
+        }
+    except requests.exceptions.RequestException as e: 
+        logger.error(f"Pulling homepage failed (RequestException): {e}")
+        raise e
+    except requests.exceptions.Timeout as e: 
+        logger.error(f"Pulling homepage failed (Timeout): {e}")
+        raise e
+
     # Splits into multiple documents to fit into LLM context.
     text_splitter = CharacterTextSplitter()
     return text_splitter.create_documents([content])

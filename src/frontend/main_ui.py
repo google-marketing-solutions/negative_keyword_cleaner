@@ -59,16 +59,17 @@ SCHEMA_EVALUATIONS = {
 
 DEBUG_SUMMARY = False
 DEBUG_SCORING = False
-DEBUG_SCORING_LIMIT = 500  # No limit: -1
+DEBUG_SCORING_LIMIT = -1  # No limit: -1
 
 URL_REGEX = r"^((http|https)://)[-a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)$"
 
-
 def display_page():
+
+  st.header("Hi 👋, I am your AI Student!")
   auth.authenticate_user()
 
-  st.header("AI Student — for Google Ads Neg Keywords")
-  st.info("Hi, I am your AI student ready to learn from your client to clean their negative keywords. Let's dive in.", icon="🎓")
+  #st.header("AI Student — for Google Ads Neg Keywords")
+  st.info("I am ready to learn from your client to clean their negative keywords. Let's dive in.", icon="🎓")
 
   display_sidebar_component()
 
@@ -105,7 +106,7 @@ def display_page():
   # 1. Company Details
   #
 
-  with st.expander("1. Company Details", expanded=st.session_state.get('context_open', True)):
+  with st.expander("1. Advertiser Information", expanded=st.session_state.get('context_open', True)):
     company_homepage_url = st.text_input(
         "Company Homepage URL",
         placeholder="https://...",
@@ -145,7 +146,8 @@ def display_page():
                "here. I'm just a student.", icon="🎓")
 
     company_pitch = st.text_area(
-        "Company Business Pitch",
+        "✅ [Positive prompt] Advertiser's business summary",
+        help="You can add campaign information below",
         placeholder="Describe what the company is selling in a few words",
         value=homepage_summary,
         height=150
@@ -154,7 +156,7 @@ def display_page():
     st.info("Happy to know more about what you don't want to target ads for", icon="🎓")
 
     exclude_pitch = st.text_area(
-        "Exclude summary",
+        "❌ [Negative prompt] Exclude summary",
         placeholder="Describe what you don't want to target ads for",
         height=50
     )
@@ -194,8 +196,8 @@ def display_page():
 
     negative_kws = kw_helper.clean_and_dedup(negative_kws_report)
     df = pd.DataFrame(
-        [(kw.get_clean_keyword_text(), kw.kw_text, kw.campaign_name, kw.campaign_id, kw.adgroup_id) 
-        for keywords in negative_kws.values() 
+        [(kw.get_clean_keyword_text(), kw.kw_text, kw.campaign_name, kw.campaign_id, kw.adgroup_id)
+        for keywords in negative_kws.values()
         for kw in keywords],
         columns=['keyword', 'original_keyword', 'campaign_name', 'campaign_id', 'adgroup_id']
     )
@@ -204,13 +206,13 @@ def display_page():
 
   with st.expander("2. Load negative keywords", expanded=st.session_state.get('load_keywords_open', True)):
     df = load_keywords()
-    # st.dataframe(df.sample(5))
-    st.success(f"I've loaded {len(df)} negative keywords from all campaigns. Filter only the relevant campaigns!", icon="🎓")
+    number_of_neg_kw = "{:,.0f}".format(len(df)).replace(",", " ")
+    st.success(f"I've loaded {number_of_neg_kw} negative keywords from all campaigns. Filter only the relevant campaigns!", icon="🎓")
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Total negative keywords", len(df))
-    col2.metric("Total unique keywords", df.keyword.nunique())
-    col3.metric("Total campaigns", df.campaign_id.nunique())
+    col1.metric("Total negative keywords", "{:,.0f}".format(len(df)).replace(",", " "))
+    col2.metric("Total unique keywords", "{:,.0f}".format(df.keyword.nunique()).replace(",", " "))
+    col3.metric("Total campaigns", "{:,.0f}".format(df.campaign_id.nunique()).replace(",", " "))
 
 
   def save_evaluations():
@@ -258,9 +260,9 @@ def display_page():
       df_filtered = df_filtered.query("campaign_name in @options")
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Selected negative keywords", len(df_filtered))
-    col2.metric("Selected Unique keywords", df_filtered.keyword.nunique())
-    col3.metric("Selected campaigns", df_filtered.campaign_id.nunique())
+    col1.metric("Selected negative keywords", "{:,.0f}".format(len(df_filtered)).replace(",", " "))
+    col2.metric("Selected Unique keywords", "{:,.0f}".format(df_filtered.keyword.nunique()).replace(",", " "))
+    col3.metric("Selected campaigns", "{:,.0f}".format(df_filtered.campaign_id.nunique()).replace(",", " "))
 
 
   def handle_continue_with_filters():

@@ -58,6 +58,7 @@ def get_customer_ids(ads_client: GoogleAdsApiClient,
     customer_client.status = 'ENABLED' AND
     customer.status = 'ENABLED'
     """
+
     query_specification = QuerySpecification(query).generate()
     if not isinstance(customer_id, MutableSequence):
         customer_id = customer_id.split(",")
