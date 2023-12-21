@@ -1,3 +1,5 @@
+@import url('https://fonts.cdnfonts.com/css/google-sans');
+
 .gsi-material-button {
   -moz-user-select: none;
   -webkit-user-select: none;
@@ -103,4 +105,12 @@
 .gsi-material-button:not(:disabled):hover .gsi-material-button-state {
   background-color: #001d35;
   opacity: 8%;
+}
+
+html, body, p, div, [class*="css"] {
+  font-family: 'Product Sans', sans-serif;
+}
+
+h2 {
+  font-family: 'Product Sans Black', sans-serif;
 }

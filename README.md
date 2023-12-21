@@ -22,7 +22,7 @@ You can edit the ```terraform/main.tf``` file under the google_iam_policy.noauth
     docker build -t gcr.io/$TF_VAR_project_id/negatives:v1 . --no-cache
     docker push gcr.io/$TF_VAR_project_id/negatives:v1
 
-    # If it doesn't deploy, you might have to run `gcloud auth configure-docker` and try again.
+If it doesn't deploy, you might have to run `gcloud auth configure-docker` and try again.
 
     # Deploys the solution.
     cd terraform/

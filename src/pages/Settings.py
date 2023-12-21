@@ -15,6 +15,11 @@
 import frontend.settings_ui as settings_ui
 import frontend.helper as st_helper
 
+import streamlit as st
+
+with open('src/frontend/style/style.css') as f:
+    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
 st_helper.initialize_session_state()
 st_helper.customize_css()
 settings_ui.validate_setup()

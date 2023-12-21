@@ -50,40 +50,27 @@ SCHEMA_EVALUATIONS = {
     "bad keyword": models.KeywordEvaluation(
         "bad keyword",
         decision=models.ScoreDecision.KEEP,
-        reason="Keep as a negative, not relevant"),
+        reason="Not relevant because ..."),
     "good keyword": models.KeywordEvaluation(
         "good keyword",
         decision=models.ScoreDecision.REMOVE,
-        reason="It is safe to target this keyword"),
+        reason="Relevant because ..."),
 }
 
-DEBUG_SUMMARY = False
-DEBUG_SCORING = False
 DEBUG_SCORING_LIMIT = -1  # No limit: -1
 
 URL_REGEX = r"^((http|https)://)[-a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)$"
 
 def display_page():
 
-  st.header("Hi 👋, I am your AI Student!")
+  st.header("Welcome to Negative Keyword Cleaner")
   auth.authenticate_user()
 
-  #st.header("AI Student — for Google Ads Neg Keywords")
-  st.info("I am ready to learn from your client to clean their negative keywords. Let's dive in.", icon="🎓")
+  st.info("I am your AI student, ready to learn from your account to identify negative keywords that block relevant ads.", icon="🧑‍🎓")
 
   display_sidebar_component()
 
-  if DEBUG_SUMMARY:
-    responses = [
-        "HTML summary 1",
-        "HTML summary 2",
-        "HTML summary 3",
-        "HTML summary 4",
-        #"Renault sells a range of vehicles, including electric, full hybrid, and mild hybrid models, with prices ranging from €11,400 to €61,900. Customers can discover, configure, and compare two models in 3D, and select and discover models based on criteria such as electric, family, city, SUV, and 7+ seats. Renault also offers services such as long-term rental, contract Sérénité Renault, and delivery time. Additionally, they provide services such as MY Renault, service client, FAQ, access for deaf and hard of hearing, ordering attestations, configure, test drive, accessories, original museum & store, renew, mobilize share, garages and concessions.",
-        "Nike is a global sportswear and lifestyle brand that sells a variety of products including shoes, apparel, and accessories, as well as services such as Nike App, Nike Run Club, Nike Training Club, SNKRS, and Factory Store. They offer exclusive collections and collaborations with top athletes and influencers, as well as guides on their products and support on order status, shipping and delivery, returns, payment methods, and promo codes. They also provide information about their company, news, careers, investors, sustainability, and legal information."
-    ]
-    llm = FakeListLLM(responses=responses)
-  elif st.session_state.config.google_api_key:
+  if st.session_state.config.google_api_key:
     print("Picked Google PALM model for summarizing")
     os.environ["GOOGLE_API_KEY"] = st.session_state.config.google_api_key
     llm = VertexAI(
@@ -110,11 +97,12 @@ def display_page():
     company_homepage_url = st.text_input(
         "Company Homepage URL",
         placeholder="https://...",
-        value="https://nike.com" if DEBUG_SUMMARY else st.session_state.get("company_homepage_url", ""),
+        value=st.session_state.get("company_homepage_url", ""),
     )
+
     if not company_homepage_url:
       st.info("Once I have their website URL, I can directly read and understand "
-              "who is this customer", icon="🎓")
+              "who is this customer", icon="🧑‍🎓")
       st.stop()
     else:
       st.session_state.company_homepage_url = company_homepage_url
@@ -127,33 +115,31 @@ def display_page():
     with st.spinner("I'm browsing their website..."):
       homepage_docs = models.fetch_landing_page_text(company_homepage_url)
       if st.session_state.get("homepage_fetched", False):
-        if DEBUG_SUMMARY: time.sleep(2)  # Too fast, we can slow it a little bit
         st.session_state.homepage_fetched = True
 
-    st.success("Browsing done, I've collected enough info", icon="🎓")
+    st.success("Browsing done, I've collected enough info", icon="🧑‍🎓")
 
-    with st.spinner("I'm now summarizing everything into an executive summary "
+    with st.spinner("I'm now consolidating everything into an executive summary "
                     "(this will take a minute) ..."):
       #models.render_custom_spinner_animation()
       if not st.session_state.get("homepage_summary", None):
-        homepage_summary = models.summarize_text(homepage_docs, llm, verbose=DEBUG_SUMMARY).strip()
-        if DEBUG_SUMMARY: time.sleep(10)  # Too fast, we can slow it a little bit
+        homepage_summary = models.summarize_text(homepage_docs, llm, verbose=True).strip()
         st.session_state.homepage_summary = homepage_summary
       else:
         homepage_summary = st.session_state.homepage_summary
 
-    st.success("Summarizing done, feel free to correct anything that I've written "
-               "here. I'm just a student.", icon="🎓")
+    st.success("Summarizing done but feel free to correct anything that I've written."
+      , icon="🎓")
 
     company_pitch = st.text_area(
-        "✅ [Positive prompt] Advertiser's business summary",
+        "✅ [Positive prompt] Advertiser's executive summary",
         help="You can add campaign information below",
         placeholder="Describe what the company is selling in a few words",
         value=homepage_summary,
         height=150
     )
 
-    st.info("Happy to know more about what you don't want to target ads for", icon="🎓")
+    st.info("Happy to know more about what you don't want to target ads for", icon="🧑‍🎓")
 
     exclude_pitch = st.text_area(
         "❌ [Negative prompt] Exclude summary",
@@ -256,7 +242,6 @@ def display_page():
     df_filtered = df.copy()
     if st.session_state.get('selected_campaigns', None):
       options = st.session_state.selected_campaigns
-      # print("Options:", options)
       df_filtered = df_filtered.query("campaign_name in @options")
 
     col1, col2, col3 = st.columns(3)
@@ -343,51 +328,32 @@ def display_page():
     formatted_keywords = yaml.dump(df_keywords['keyword'].tolist(), allow_unicode=True)
 
     template = textwrap.dedent("""\
-        You are an agent working for a Google Ads agency asked to score keyword against .
+        You are an agent working for an agency that optimizes Google Ads campaigns. 
+        Your job is to evaluate if keywords set as "negative targeting" from an Advertiser's Google Ads account are relevant or not.
+        To do that, you first need to take into consideration the following advertiser's business context:
 
         {company_segment}
 
-        Learn from these examples scored by an expert, formatted as YAML output, especially learn from the reason column:
+        Then you need to learn from the following examples scored by an expert, formatted as YAML, especially learn from the reason column:
 
         {facts_segment}
 
-        The category field can only take one of the following values: {category_allowed_values}.
         The decision field can only take one of the following values: {decision_allowed_values}.
-        The reason field is a free form string that explains why it picked this category and decision.
+        The reason field is a free form string that explains why it decided to KEEP or REMOVE a keyword.
 
         The decision to keep a keyword means that this keyword should be excluded from targeting.
         The decision to remove a keyword means that we want to target this keyword.
 
-        Given this context and examples, score this new list of keywords with relevancy and add a detailed reason why you scored that way inspired by the reason used in our examples above formatted as valid YAML output:
+        Given this above context and examples, score this new list of keywords with relevancy and add a detailed reason as to why you scored that way, formatted as valid YAML output according to YAML specifications:
 
         {keywords_segment}
         """)
     prompt = PromptTemplate(
         template=template,
-        input_variables=["company_segment", "facts_segment", "keywords_segment", "category_allowed_values", "decision_allowed_values"],
+        input_variables=["company_segment", "facts_segment", "keywords_segment", "decision_allowed_values"],
     )
 
-    if DEBUG_SCORING:
-      scoring_llm = FakeListLLM(responses=[
-          textwrap.dedent("""\
-              - keyword: taille coffre renault arkana
-                reason: It is safe to target this keyword as it is related to a Renault product
-                decision: remove
-              - keyword: "location v\xE9hicule utilitaire"
-                reason: Can target this generic query
-                decision: remove
-              - keyword: acheter une renault captur hybride
-                reason: Safe to target hybrid models
-                decision: remove
-              - keyword: accessoires renault trafic
-                reason: We don't want to sell accessories
-                decision: keep
-              - keyword: essai citadine
-                reason: Safe to target generic model queries
-                decision: remove
-              """)
-          ])
-    elif st.session_state.config.google_api_key:
+    if st.session_state.config.google_api_key:
       print("Picked Google PALM model for scoring")
       os.environ["GOOGLE_API_KEY"] = st.session_state.config.google_api_key
       scoring_llm = VertexAI(

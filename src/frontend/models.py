@@ -36,7 +36,8 @@ HTML_EXCLUDE_TAGS = [
 ]
 
 SUMMARY_PROMPT_TEMPLATE = textwrap.dedent("""\
-    Write a concise bullet point summary of the following company homepage and explain what do they sell as product or added value:
+    Use the following company homepage and personal knowledge to write a concise bullet point summary.
+    Explain what do they sell as product, service or added value:
 
     {text}
 
@@ -71,10 +72,10 @@ def fetch_landing_page_text(url: str) -> list[Document]:
             "title": soup.find("title").string,
             "description": soup.find("meta", property="description", content=True),
         }
-    except requests.exceptions.RequestException as e: 
+    except requests.exceptions.RequestException as e:
         logger.error(f"Pulling homepage failed (RequestException): {e}")
         raise e
-    except requests.exceptions.Timeout as e: 
+    except requests.exceptions.Timeout as e:
         logger.error(f"Pulling homepage failed (Timeout): {e}")
         raise e
 
@@ -195,6 +196,7 @@ def parse_scoring_response(response: str) -> list[KeywordEvaluation]:
         .replace('```yaml', '')
         .replace('```YAML', '')
         .replace('```', '')
+        .replace('---', '')
         .strip()
     )
 

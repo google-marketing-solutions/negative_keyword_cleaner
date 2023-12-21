@@ -87,11 +87,11 @@ gitdb==4.0.10
     # via gitpython
 gitpython==3.1.32
     # via streamlit
-google-ads==21.2.0
+google-ads==22.1.0
     # via
     #   -r requirements.in
     #   google-ads-api-report-fetcher
-google-ads-api-report-fetcher==1.10.0
+google-ads-api-report-fetcher==1.12.1
     # via -r requirements.in
 google-api-core[grpc]==2.11.0
     # via
@@ -195,9 +195,9 @@ jsonschema-specifications==2023.7.1
     # via jsonschema
 kiwisolver==1.4.4
     # via matplotlib
-langchain==0.0.312
+langchain==0.0.310
     # via -r requirements.in
-langsmith==0.0.43
+langsmith==0.0.72
     # via langchain
 markdown-it-py==3.0.0
     # via rich
@@ -235,7 +235,7 @@ openai==0.27.8
     # via -r requirements.in
 openapi-schema-pydantic==1.2.4
     # via langchain
-packaging==23.1
+packaging==23.2
     # via
     #   google-cloud-aiplatform
     #   google-cloud-bigquery
@@ -273,7 +273,7 @@ protobuf==4.23.4
     #   grpcio-status
     #   proto-plus
     #   streamlit
-pyarrow==12.0.1
+pyarrow==14.0.1
     # via
     #   google-ads-api-report-fetcher
     #   streamlit

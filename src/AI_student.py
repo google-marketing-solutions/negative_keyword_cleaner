@@ -20,8 +20,8 @@ from frontend import main_ui
 
 # The Page UI starts here
 st.set_page_config(
-    page_title="AI Student",
-    page_icon="🎓",
+    page_title="Negative Keyword Cleaner",
+    page_icon="🧑‍🎓",
     layout="wide"
 )
 
