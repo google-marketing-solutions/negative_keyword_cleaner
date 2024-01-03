@@ -25,7 +25,7 @@ from google.api_core import exceptions
 
 from utils import auth
 from utils.config import Config
-from utils.gaarf_queries import AdgroupNegativeKeywords, CampaignNegativeKeywords, KeywordLevel
+from utils.gaarf_queries import CustomerNames, AdgroupNegativeKeywords, CampaignNegativeKeywords, KeywordLevel
 
 _GOOGLE_ADS_API_VERSION = "v13"
 
@@ -53,7 +53,8 @@ def get_customer_ids(ads_client: GoogleAdsApiClient,
 
     # Fetches ENABLED and CANCELED accounts.
     query = """
-    SELECT customer_client.id FROM customer_client
+    SELECT customer_client.id
+    FROM customer_client
     WHERE customer_client.manager = FALSE AND
     customer_client.status = 'ENABLED' AND
     customer.status = 'ENABLED'
@@ -78,6 +79,10 @@ def get_customer_ids(ads_client: GoogleAdsApiClient,
 
     return customer_ids
 
+class Customer:
+    def __init__(self, customer_id:str, customer_name:str):
+        self.customer_id = customer_id
+        self.customer_name = customer_name
 
 class Keyword:
     def __init__(
@@ -132,9 +137,19 @@ class KeywordHelper:
         except exceptions.InternalServerError as e:
             return None
 
-    def get_neg_keywords(self) -> GaarfReport:
-        adgroup_neg_kws = self.report_fetcher.fetch(AdgroupNegativeKeywords())
-        campaign_neg_kws = self.report_fetcher.fetch(CampaignNegativeKeywords())
+    def get_customers(self) -> GaarfReport:
+        customers = self.report_fetcher.fetch(CustomerNames())
+        return customers
+
+    def get_neg_keywords(self,selected_customers:list) -> GaarfReport:
+        pattern = r'^(\d+)'
+        customer_ids = []
+        for customer in selected_customers:
+            match = re.match(pattern, customer)
+            if match:
+                customer_ids.append(match.group(1))
+        adgroup_neg_kws = self.report_fetcher.fetch(AdgroupNegativeKeywords(), customer_ids)
+        campaign_neg_kws = self.report_fetcher.fetch(CampaignNegativeKeywords(), customer_ids)
         return adgroup_neg_kws + campaign_neg_kws
 
     def clean_and_dedup(self, raw_keyword_data: GaarfReport) -> dict:

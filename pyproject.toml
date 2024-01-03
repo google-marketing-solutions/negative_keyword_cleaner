@@ -5,6 +5,7 @@ description = ""
 authors = [
   {name = "Pierre Dulac", email = "dulacp@google.com"},
   {name = "Mariam Youssef", email = "mariamyoussef@google.com"},
+  {name = "François Pérez", email = "fraperez@google.com"},
 ]
 readme = "README.md"
 classifiers = ["Private :: Do Not Upload"]

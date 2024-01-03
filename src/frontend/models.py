@@ -37,7 +37,7 @@ HTML_EXCLUDE_TAGS = [
 
 SUMMARY_PROMPT_TEMPLATE = textwrap.dedent("""\
     Use the following company homepage and personal knowledge to write a concise bullet point summary.
-    Explain what do they sell as product, service or added value:
+    Explain what they sell as product, service or added value:
 
     {text}
 
@@ -125,7 +125,6 @@ class KeywordEvaluation:
     """LLM or Human evaluation."""
     keyword: str
     decision: ScoreDecision = ScoreDecision.UNKNOWN
-    #category: ScoreCategory = ScoreCategory.UNKNOWN
     reason: str = ""
 
     # def __getstate__(self):
@@ -153,8 +152,6 @@ class KeywordEvaluation:
         return cls(
             keyword=data.get("keyword", data.get("Keyword")),
             decision=ScoreDecision(data.get("decision", ScoreDecision.UNKNOWN.value)),
-            #category=ScoreCategory(data.get("category", ScoreCategory.UNKNOWN.value)),
-            #category=ScoreCategory.UNKNOWN.value,
             reason=data.get("reason", "Unspecified")
         )
 
@@ -191,7 +188,7 @@ def format_scoring_fragment(evaluations: OrderedDict[str, KeywordEvaluation]) ->
 def parse_scoring_response(response: str) -> list[KeywordEvaluation]:
     """Parses the LLM response, expecting a YAML format."""
 
-    # PALM 2 cleaning
+    # PaLM 2 cleaning
     response = (response
         .replace('```yaml', '')
         .replace('```YAML', '')

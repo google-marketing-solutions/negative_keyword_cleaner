@@ -19,7 +19,6 @@ import urllib.parse
 
 import requests
 import streamlit as st
-# from streamlit_oauth import OAuth2Component
 
 import frontend.helper as st_helper
 from utils import auth

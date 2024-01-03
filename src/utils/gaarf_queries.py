@@ -20,6 +20,18 @@ class KeywordLevel(Enum):
     CAMPAIGN = 'Campaign'
     ADGROUP = 'Adgroup'
 
+class CustomerNames(BaseQuery):
+    def __init__(self) -> None:
+        self.query_text = f"""
+            SELECT
+                customer_client.id,
+                customer_client.descriptive_name
+            FROM customer_client
+            WHERE
+                customer_client.manager = FALSE AND
+                customer_client.status = 'ENABLED' AND
+                customer.status = 'ENABLED'
+        """
 
 class AdgroupNegativeKeywords(BaseQuery):
     def __init__(self) -> None:
@@ -43,6 +55,7 @@ class AdgroupNegativeKeywords(BaseQuery):
                 campaign.status = 'ENABLED' AND
                 ad_group.status = 'ENABLED'
         """
+
 class CampaignNegativeKeywords(BaseQuery):
     def __init__(self) -> None:
         self.query_text = f"""

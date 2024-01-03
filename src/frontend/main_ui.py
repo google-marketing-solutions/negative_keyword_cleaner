@@ -38,7 +38,7 @@ import yaml
 from .components.sidebar import display_sidebar_component
 from . import models
 from utils import auth
-from utils.keyword_helper import KeywordHelper
+from utils.keyword_helper import KeywordHelper, Customer
 
 logging.getLogger().setLevel(logging.DEBUG)
 logger = logging.Logger(__name__)
@@ -168,14 +168,15 @@ def display_page():
   #
 
   @st.cache_resource(show_spinner=False)
-  def load_keywords():
+  def load_keywords(selected_customers:list):
     kw_helper = KeywordHelper(st.session_state.config)
+
     if not kw_helper:
-        st.error("An internal error occurred. Try again later")
+        st.error("An internal error occurred. Could not load KeywordHelper.")
         return
 
     with st.spinner(text='Loading negative keywords... This may take a few minutes'):
-        negative_kws_report = kw_helper.get_neg_keywords()
+        negative_kws_report = kw_helper.get_neg_keywords(selected_customers)
         if not negative_kws_report:
             st.warning("No negative keywords found")
             st.stop()
@@ -189,9 +190,62 @@ def display_page():
     )
     return df
 
+  @st.cache_resource(show_spinner=False)
+  def load_customers():
+    kw_helper = KeywordHelper(st.session_state.config)
+    if not kw_helper:
+      st.error("An internal error occured. Could not load KeywordHelper.")
+      return
 
-  with st.expander("2. Load negative keywords", expanded=st.session_state.get('load_keywords_open', True)):
-    df = load_keywords()
+    with st.spinner(text="Loading customers under MCC, please wait..."):
+      customers_report = kw_helper.get_customers()
+      if not customers_report:
+        st.warning("No Customers found under MCC.")
+        st.stop()
+
+      all_customers = []
+      for customer in customers_report:
+        customer = Customer(customer.customer_client_id, customer.customer_client_descriptive_name)
+        all_customers.append(customer)
+
+      df = pd.DataFrame(
+        [(cust.customer_id, cust.customer_name)
+        for cust in all_customers],
+        columns=['customer_id', 'customer_name'])
+
+    return df
+
+  def reset_batch_props():
+    st.session_state.batch_scored_keywords = set()
+    st.session_state.keyword_feedback_eval = None
+
+  def handle_selected_customers():
+    reset_batch_props()
+    st.session_state.scored_keywords = None
+
+  def handle_selected_campaigns():
+    reset_batch_props()
+    st.session_state.scored_keywords = None
+
+  def handle_continue_with_customers():
+    st.session_state.customers_ready = True
+
+  with st.expander("2. Load Customers", expanded=st.session_state.get('load_customers_open', True)):
+    df = load_customers()
+    selected_customers = st.multiselect(
+        "Selected Customers",
+        df['customer_id'].astype(str) + ' - ' + df['customer_name'].astype(str),
+        [],
+        on_change=handle_selected_customers,
+        key='selected_customers',
+    )
+
+    if not st.session_state.get('customers_ready', False):
+      st.button("Continue with these customers", on_click=handle_continue_with_customers)
+      st.stop()
+
+  with st.expander("3. Load negative keywords", expanded=st.session_state.get('load_keywords_open', True)):
+    df = load_keywords(selected_customers)
     number_of_neg_kw = "{:,.0f}".format(len(df)).replace(",", " ")
     st.success(f"I've loaded {number_of_neg_kw} negative keywords from all campaigns. Filter only the relevant campaigns!", icon="🎓")
 
@@ -201,36 +255,7 @@ def display_page():
     col3.metric("Total campaigns", "{:,.0f}".format(df.campaign_id.nunique()).replace(",", " "))
 
 
-  def save_evaluations():
-    evaluations = st.session_state.evaluations
-    with open(".streamlit/evaluations.json", "w") as fp:
-      json.dump(evaluations, fp, cls=EnhancedJSONEncoder, indent=2)
-
-
-  def load_evaluations():
-    with open(".streamlit/evaluations.json", "r") as fp:
-      evaluations = json.load(fp, cls=EnhancedJSONDecoder)
-      print(f"Loaded #{len(evaluations)} evaluations")
-      st.session_state.evaluations = evaluations
-
-
-  def reset_evaluations():
-    st.session_state.evaluations = OrderedDict()
-
-
-  def reset_batch_props():
-    st.session_state.batch_scored_keywords = set()
-    st.session_state.keyword_feedback_eval = None
-
-
-  def handle_selected_campaigns():
-    print("Reset evaluations")
-    reset_evaluations()
-    reset_batch_props()
-    st.session_state.scored_keywords = None
-
-
-  with st.expander("3. Filter on campaigns", expanded=st.session_state.get('filter_campaigns_open', True)):
+  with st.expander("4. Filter on campaigns", expanded=st.session_state.get('filter_campaigns_open', True)):
     st.multiselect(
         "Selected Campaigns",
         df.groupby(['campaign_name'])['keyword'].count().reset_index(name='count').sort_values(["count"], ascending=False),
@@ -252,7 +277,6 @@ def display_page():
 
   def handle_continue_with_filters():
     st.session_state.filters_ready = True
-
 
   if not st.session_state.get('filters_ready', False):
     st.button("Continue with these filters", on_click=handle_continue_with_filters)
@@ -298,13 +322,15 @@ def display_page():
   if st.session_state.get('load_keywords_open'):
     st.session_state.load_keywords_open = False
     time.sleep(0.05)
-    st.experimental_rerun()
+    st.rerun()
 
 
   ##
   # 3. Samples and Scores the sampled batch.
   #
-
+  def reset_evaluations():
+    st.session_state.evaluations = OrderedDict()
+    
   if "evaluations" not in st.session_state:
     reset_evaluations()
 
