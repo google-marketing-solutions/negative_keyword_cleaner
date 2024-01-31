@@ -55,6 +55,11 @@ class Config:
     openai_api_key: str = ''
     google_api_key: str = GOOGLE_VERTEXAI_API_KEY
 
+    gemini_enabled: str = False
+
+    # Tool settings
+    batch_size: int = 15
+
     @classmethod
     def from_disk(cls, config_path=None):
         if config_path is None:

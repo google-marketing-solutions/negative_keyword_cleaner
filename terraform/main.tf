@@ -117,6 +117,7 @@ resource "google_cloud_run_v2_service" "default" {
         }
       }
     }
+    service_account = "${google_service_account.main.email}"
     session_affinity = true
   }
 

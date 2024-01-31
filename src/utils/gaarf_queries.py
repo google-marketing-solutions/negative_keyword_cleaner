@@ -17,10 +17,27 @@ from gaarf.base_query import BaseQuery
 
 
 class KeywordLevel(Enum):
+    """
+    Enum class to represent different levels at which keywords can be applied in an advertising context.
+
+    Attributes:
+        ACCOUNT (str): Represents the account level.
+        CAMPAIGN (str): Represents the campaign level.
+        ADGROUP (str): Represents the ad group level.
+    """
+    ACCOUNT = 'Account'
     CAMPAIGN = 'Campaign'
     ADGROUP = 'Adgroup'
 
+
 class CustomerNames(BaseQuery):
+    """
+    Class for querying customer names.
+
+    This class extends BaseQuery to execute a SQL query that selects the ID and descriptive name
+    of customers who are not managers and have an enabled status both at the customer and the client level.
+    """
+
     def __init__(self) -> None:
         self.query_text = f"""
             SELECT
@@ -33,7 +50,15 @@ class CustomerNames(BaseQuery):
                 customer.status = 'ENABLED'
         """
 
+
 class AdgroupNegativeKeywords(BaseQuery):
+    """
+    Class for querying ad group negative keywords.
+
+    This class extends BaseQuery to execute a SQL query that selects details of negative keywords
+    at the ad group level, including the criterion ID, keyword text, match type, and other relevant information.
+    """
+
     def __init__(self) -> None:
         self.query_text = f"""
             SELECT
@@ -56,6 +81,7 @@ class AdgroupNegativeKeywords(BaseQuery):
                 ad_group.status = 'ENABLED'
         """
 
+
 class CampaignNegativeKeywords(BaseQuery):
     def __init__(self) -> None:
         self.query_text = f"""
@@ -76,4 +102,56 @@ class CampaignNegativeKeywords(BaseQuery):
                 campaign_criterion.negative = True AND
                 campaign_criterion.type = 'KEYWORD' AND
                 campaign.status = 'ENABLED'
+        """
+
+
+class AccountNegativeKeywords(BaseQuery):
+    """
+    Class for querying account level negative keywords.
+
+    This class extends BaseQuery to execute a SQL query that selects details of negative keywords
+    at the account level, including shared set ID, keyword text, match type, and other related information.
+    """
+
+    def __init__(self) -> None:
+        self.query_text = f"""
+            SELECT
+                shared_set.id AS criterion_id,
+                'True' AS is_negative,
+                shared_criterion.keyword.text AS keyword,
+                shared_criterion.keyword.match_type AS match_type,
+                '{KeywordLevel.ACCOUNT.value}' AS level,
+                0 AS adgroup_id,
+                '' AS adgroup_name,
+                0 AS campaign_id,
+                shared_set.name AS campaign_name,
+                0 AS account_id,
+                '' AS account_name,
+                shared_set.type,
+                shared_set.resource_name AS resource_name,
+            FROM
+                shared_criterion
+            WHERE
+                shared_set.type = NEGATIVE_KEYWORDS
+        """
+
+
+class CampaignsForSharedSets(BaseQuery):
+    """
+    Class for querying campaigns that are associated with specific shared sets.
+
+    This class extends BaseQuery to execute a SQL query that selects details of campaigns
+    linked to given shared sets, which are identified by their resource names.
+    """
+
+    def __init__(self, campaign_resource_names) -> None:
+        self.query_text = f"""
+            SELECT
+              campaign.id,
+              campaign.name,
+              campaign_shared_set.shared_set
+            FROM
+              campaign_shared_set
+            WHERE
+              campaign_shared_set.shared_set IN ({','.join([f"'{name}'" for name in campaign_resource_names])})
         """

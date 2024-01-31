@@ -19,7 +19,6 @@ dependencies = [
   "beautifulsoup4",
   "tiktoken",
   "transformers",
-  "streamlit-lottie",
   "streamlit-elements",
   "matplotlib",
   "google-auth-oauthlib",

@@ -36,6 +36,8 @@ def initialize_session_state():
         st.session_state.config = Config.from_gcs() if is_appengine() else Config.from_disk()
     if "loaded_kws" not in st.session_state:
         st.session_state.loaded_kws = []
+    if "batch_size" not in st.session_state:
+        st.session_state.batch_size = 15
 
 
 def display(value):

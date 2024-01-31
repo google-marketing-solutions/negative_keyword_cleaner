@@ -25,9 +25,11 @@ from google.api_core import exceptions
 
 from utils import auth
 from utils.config import Config
-from utils.gaarf_queries import CustomerNames, AdgroupNegativeKeywords, CampaignNegativeKeywords, KeywordLevel
+from utils.gaarf_queries import CustomerNames, AdgroupNegativeKeywords, \
+    CampaignNegativeKeywords, KeywordLevel, AccountNegativeKeywords, \
+    CampaignsForSharedSets
 
-_GOOGLE_ADS_API_VERSION = "v13"
+_GOOGLE_ADS_API_VERSION = "v15"
 
 
 class MatchType(Enum):
@@ -39,7 +41,7 @@ class MatchType(Enum):
 
 
 def get_customer_ids(ads_client: GoogleAdsApiClient,
-                     customer_id: Union[str, MutableSequence[str]],
+                     customer_id: Union[str, Sequence[str]],
                      customer_ids_query: str = None) -> Sequence[str]:
     """Gets list of customer_ids from an MCC account.
 
@@ -48,48 +50,48 @@ def get_customer_ids(ads_client: GoogleAdsApiClient,
         customer_id: MCC account_id.
         custom_query: GAQL query used to reduce the number of customer_ids.
     Returns:
-        All customer_ids from MCC safisfying the condition.
+        All customer_ids from MCC satisfying the condition.
     """
 
-    # Fetches ENABLED and CANCELED accounts.
-    query = """
+    def fetch_customer_ids(query: str) -> Sequence[str]:
+        """Fetches customer ids based on the provided query."""
+        report_fetcher = AdsReportFetcher(ads_client, customer_id)
+        result = report_fetcher.fetch(QuerySpecification(query).generate())
+        return [row[0] if isinstance(row, GaarfRow) else row for row in result]
+
+    # Standard query to fetch ENABLED and CANCELED accounts.
+    standard_query = """
     SELECT customer_client.id
     FROM customer_client
     WHERE customer_client.manager = FALSE AND
-    customer_client.status = 'ENABLED' AND
-    customer.status = 'ENABLED'
+          customer_client.status = 'ENABLED' AND
+          customer.status = 'ENABLED'
     """
 
-    query_specification = QuerySpecification(query).generate()
-    if not isinstance(customer_id, MutableSequence):
-        customer_id = customer_id.split(",")
-    report_fetcher = AdsReportFetcher(ads_client, customer_id)
-    customer_ids = report_fetcher.fetch(query_specification).to_list()
+    customer_id = [customer_id] if isinstance(customer_id, str) else list(
+        customer_id)
+    customer_ids = fetch_customer_ids(standard_query)
+
+    # Apply custom query if provided.
     if customer_ids_query:
-        report_fetcher = AdsReportFetcher(ads_client, customer_ids)
-        query_specification = QuerySpecification(customer_ids_query).generate()
-        customer_ids = report_fetcher.fetch(query_specification)
-        customer_ids = [
-            row[0] if isinstance(row, GaarfRow) else row
-            for row in customer_ids
-        ]
+        customer_ids = fetch_customer_ids(customer_ids_query)
 
-    customer_ids = list(
-        set([customer_id for customer_id in customer_ids if customer_id != 0]))
+    # Remove duplicate and zero IDs.
+    return list({cid for cid in customer_ids if cid != 0})
 
-    return customer_ids
 
 class Customer:
-    def __init__(self, customer_id:str, customer_name:str):
+    def __init__(self, customer_id: str, customer_name: str):
         self.customer_id = customer_id
         self.customer_name = customer_name
 
+
 class Keyword:
     def __init__(
-        self, criterion_id:str, original_keyword:str, keyword:str, 
-        is_negative:bool, match_type:MatchType, level:KeywordLevel, 
-        adgroup_id:int, adgroup_name:str, campaign_id:int, 
-        campaign_name:str, account_id:int, account_name:str):
+            self, criterion_id: str, original_keyword: str, keyword: str,
+            is_negative: bool, match_type: MatchType, level: KeywordLevel,
+            adgroup_id: int, adgroup_name: str, campaign_id: int,
+            campaign_name: str, account_id: int, account_name: str):
         self.criterion_id = criterion_id
         self.original_kw_text = original_keyword
         self.kw_text = keyword
@@ -110,12 +112,12 @@ class Keyword:
             case MatchType.PHRASE:
                 return self.kw_text.replace("\"", "")
             case MatchType.EXACT:
-                return self.kw_text.replace("[", "").replace("]","")
+                return self.kw_text.replace("[", "").replace("]", "")
         return self.kw_text
 
 
 class KeywordHelper:
-    def __init__(self, config:Config):
+    def __init__(self, config: Config):
         # Expand the mcc account to child accounts to initialize the report fetcher
         googleads_api_client = GoogleAdsApiClient(
             config_dict={
@@ -141,22 +143,27 @@ class KeywordHelper:
         customers = self.report_fetcher.fetch(CustomerNames())
         return customers
 
-    def get_neg_keywords(self,selected_customers:list) -> GaarfReport:
+    def get_neg_keywords(self, selected_customers: list) -> GaarfReport:
         pattern = r'^(\d+)'
         customer_ids = []
         for customer in selected_customers:
             match = re.match(pattern, customer)
             if match:
                 customer_ids.append(match.group(1))
-        adgroup_neg_kws = self.report_fetcher.fetch(AdgroupNegativeKeywords(), customer_ids)
-        campaign_neg_kws = self.report_fetcher.fetch(CampaignNegativeKeywords(), customer_ids)
+
+        adgroup_neg_kws = self.report_fetcher.fetch(AdgroupNegativeKeywords(),
+                                                    customer_ids)
+        campaign_neg_kws = self.report_fetcher.fetch(
+            CampaignNegativeKeywords(), customer_ids)
+
         return adgroup_neg_kws + campaign_neg_kws
 
     def clean_and_dedup(self, raw_keyword_data: GaarfReport) -> dict:
         all_keywords = {}
         for kw in raw_keyword_data:
             keyword_obj = Keyword(
-                kw.criterion_id, kw.keyword, kw.keyword, kw.is_negative, kw.match_type,
+                kw.criterion_id, kw.keyword, kw.keyword, kw.is_negative,
+                kw.match_type,
                 kw.level, kw.adgroup_id, kw.adgroup_name, kw.campaign_id,
                 kw.campaign_name, kw.account_id, kw.account_name)
             clean_kw = keyword_obj.get_clean_keyword_text()

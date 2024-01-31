@@ -1,9 +1,11 @@
-streamlit==1.29.0
+streamlit
 google-api-python-client
 google-ads
 google-ads-api-report-fetcher
 tenacity
 langchain
+langchain-google-genai
+langchain-google-vertexai
 watchdog
 openai
 pyyaml
