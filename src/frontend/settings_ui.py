@@ -63,7 +63,7 @@ def validate_setup() -> None:
 
     # Save any changes in the config file
     if config_updated:
-        save_config(config)
+        _save_config(config)
 
     st.session_state.valid_config = all([
         st.session_state.valid_ads_config,
