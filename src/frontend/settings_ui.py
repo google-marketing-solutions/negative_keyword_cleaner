@@ -106,7 +106,7 @@ def save_ads_config(config) -> None:
     config.login_customer_id = str(
         st.session_state.login_customer_id.replace("-", ""))
     config.developer_token = st.session_state.developer_token
-    save_config(config)
+    _save_config(config)
     if st.session_state.login_customer_id and st.session_state.developer_token:
         st.session_state.valid_ads_config = True
         st.session_state.updating_config = False
