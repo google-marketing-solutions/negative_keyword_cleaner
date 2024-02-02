@@ -216,12 +216,12 @@ def display_page() -> None:
         negative_keyword_list = pd.DataFrame(
             [(kw.get_clean_keyword_text(), kw.kw_text, kw.match_type,
               kw.campaign_name, kw.campaign_id, kw.adgroup_id, kw.adgroup_name,
-              kw.account_id)
+              kw.account_id, kw.account_name)
              for keywords in negative_kws.values()
              for kw in keywords],
             columns=['keyword', 'original_keyword', 'match_type',
                      'campaign_name', 'campaign_id', 'adgroup_id',
-                     'adgroup_name', 'account_id']
+                     'adgroup_name', 'account_id', 'account_name']
         )
         return negative_keyword_list
 
@@ -339,7 +339,7 @@ def display_page() -> None:
                     "{:.0f}".format(df.keyword.nunique()).replace(",", " "))
         col3.metric("Total campaigns",
                     "{:.0f}".format(df.campaign_id.nunique()).replace(",",
-                                                                       " "))
+                                                                      " "))
 
     with st.expander("4. Filter on campaigns",
                      expanded=st.session_state.get('filter_campaigns_open',
@@ -409,6 +409,7 @@ def display_page() -> None:
         """
         A JSON encoder class that handles the serialization of dataclass objects.
         """
+
         def default(self, o):
             if dataclasses.is_dataclass(o):
                 return dataclasses.asdict(o)
@@ -578,7 +579,7 @@ def display_page() -> None:
                                                      None)
 
         def _save_human_eval(*, human_eval: models.KeywordEvaluation,
-                            llm_eval: models.KeywordEvaluation) -> None:
+                             llm_eval: models.KeywordEvaluation) -> None:
             """
             Save the human evaluation alongside the corresponding LLM evaluation.
             Updates the evaluations dictionary and the scored set with the human evaluation,
@@ -595,7 +596,7 @@ def display_page() -> None:
                                       human_decision=human_eval.decision))
 
         def _define_handler_scoring(llm_eval: models.KeywordEvaluation,
-                                   human_agree_with_llm: bool) -> Callable:
+                                    human_agree_with_llm: bool) -> Callable:
             """
             Define a handler for scoring, which returns an inner function to handle the logic
             of saving human evaluations based on agreement with LLM evaluations.
@@ -755,7 +756,7 @@ def display_page() -> None:
                             disagree_button = mui.Button(
                                 "Disagree with Student", color="error",
                                 onClick=_define_handler_scoring(item,
-                                                               human_agree_with_llm=False),
+                                                                human_agree_with_llm=False),
                                 sx={"margin-right": "auto"})
                             agree_button = mui.Button("Agree with Student",
                                                       color="success",
@@ -915,21 +916,22 @@ def display_page() -> None:
         # Prepares the keywords to remove for download.
         formatted_evals_to_remove = [
             {
-                "keyword": student_eval.keyword,
-                "student_decision": student_eval.decision,
-                "student_reason": student_eval.reason,
-                "original_keyword": df_entry.original_keyword,
-                "match_type": df_entry.match_type,
-                "campaign_name": df_entry.campaign_name,
-                "campaign_id": df_entry.campaign_id,
-                "adgroup_id": df_entry.adgroup_id,
-                "adgroup_name": df_entry.adgroup_name,
-                "account_id": df_entry.account_id,
+                "Account": df_entry.account_name,
+                "Campaign": df_entry.campaign_name,
+                "Ad Group": df_entry.adgroup_name,
+                "Keyword": student_eval.keyword,
+                "Criterion Type": ("Negative " if df_entry.adgroup_name else "Campaign Negative ") +
+                              ("Broad" if df_entry.match_type == "BROAD" else
+                               "Phrase" if df_entry.match_type == "PHRASE" else
+                               "Exact"),
+                "Status": "Removed",
+                "Student Reason": student_eval.reason,
             }
             for student_eval in cached_scoring_kws_evals
             if student_eval.decision == models.ScoreDecision.REMOVE
             for df_entry in df_filtered.itertuples()
-            if df_entry.keyword == student_eval.keyword
+            if df_entry.keyword == student_eval.keyword and (
+                       df_entry.campaign_name or df_entry.adgroup_id)
         ]
         formatted_evals_to_keep = [
             {

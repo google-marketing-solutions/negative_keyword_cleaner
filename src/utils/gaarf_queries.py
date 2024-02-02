@@ -91,7 +91,7 @@ class CampaignNegativeKeywords(BaseQuery):
                 campaign_criterion.negative AS is_negative,
                 campaign_criterion.keyword.match_type AS match_type,
                 '{KeywordLevel.CAMPAIGN.value}' AS level,
-                0 AS adgroup_id,
+                '' AS adgroup_id,
                 '' AS adgroup_name,
                 campaign.id AS campaign_id,
                 campaign.name AS campaign_name,
