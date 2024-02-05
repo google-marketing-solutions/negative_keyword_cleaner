@@ -41,8 +41,6 @@ from utils.keyword_helper import KeywordHelper, Customer
 logging.getLogger().setLevel(logging.DEBUG)
 logger = logging.Logger(__name__)
 
-_SAMPLE_BATCH_SIZE = 5
-
 _SCHEMA_EVALUATIONS = {
     "bad keyword": models.KeywordEvaluation(
         "bad keyword",
@@ -454,7 +452,7 @@ def display_page() -> None:
                                             models.get_random_state())
         df_keywords = models.sample_batch(
             df_filtered,
-            batch_size=_SAMPLE_BATCH_SIZE,
+            batch_size=st.session_state.batch_size,
             exclude_keywords=set(evaluations.keys()),
             random_state=random_state)
 

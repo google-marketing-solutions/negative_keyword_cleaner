@@ -32,12 +32,12 @@ DEFAULT_BUCKET_NAME = os.getenv('DEFAULT_BUCKET_NAME')
 GOOGLE_VERTEXAI_API_KEY = os.getenv('GOOGLE_VERTEXAI_API_KEY', '')
 
 
-def is_appengine():
-    return os.getenv('RUNNING_ON_GAE') is not None
+def is_cloudrun():
+    return os.getenv('K_SERVICE') is not None
 
 
 # NOTE: No need for a storage client in local env.
-storage_client = storage.Client() if is_appengine() else None
+storage_client = storage.Client() if is_cloudrun() else None
 
 
 @dataclass
@@ -83,7 +83,8 @@ class Config:
         bucket = storage_client.bucket(DEFAULT_BUCKET_NAME)
         blob = bucket.blob(GCS_CONFIG_FILE)
         try:
-            blob.download_to_file('/tmp/app_config.yaml')
+            with open('/tmp/app_config.yaml', 'wb') as file_obj:
+                blob.download_to_file(file_obj)
         except NotFound:
             print(f'The file {GCS_CONFIG_FILE} does not exist in bucket {DEFAULT_BUCKET_NAME}.')
             return cls()

@@ -17,7 +17,7 @@ import streamlit as st
 
 import frontend.helper as st_helper
 from utils import auth
-from utils.config import is_appengine, Config
+from utils.config import is_cloudrun, Config
 
 logger = logging.getLogger("streamlit")
 
@@ -79,7 +79,7 @@ def _save_config(config) -> None:
     Parameters:
     config: The configuration object to be saved.
     """
-    if is_appengine():
+    if is_cloudrun():
         config.save_to_gcs()
     else:
         config.save_to_disk()
@@ -104,8 +104,8 @@ def save_ads_config(config) -> None:
     config: The configuration object containing Google Ads settings.
     """
     config.login_customer_id = str(
-        st.session_state.login_customer_id.replace("-", ""))
-    config.developer_token = st.session_state.developer_token
+        st.session_state.login_customer_id.replace("-", "").strip())
+    config.developer_token = st.session_state.developer_token.strip()
     _save_config(config)
     if st.session_state.login_customer_id and st.session_state.developer_token:
         st.session_state.valid_ads_config = True
@@ -150,9 +150,9 @@ def display_page() -> None:
     """
     Display the application settings page.
     """
-    auth.authenticate_user()
-
     st.subheader("App Settings")
+
+    auth.authenticate_user()
 
     if st.session_state.valid_config:
         st.success("Application successfully setup ✅")

@@ -73,7 +73,20 @@ def fetch_landing_page_text(url: str) -> List[Document]:
     """
     content = ""
     try:
-        response = requests.get(url)
+        # Since we are making requests from a datacenter,
+        # the following request sometimes get rejected.
+        #
+        # To avoid this, we are mimicking an actual browser
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'DNT': '1',  # Do Not Track Request Header
+            'Upgrade-Insecure-Requests': '1',
+        }
+        response = requests.get(url, headers=headers)
         response.raise_for_status()
 
         text_content = response.text

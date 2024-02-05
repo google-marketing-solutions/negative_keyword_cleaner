@@ -28,6 +28,31 @@ resource "google_project_iam_member" "aiplatform_user" {
 }
 
 ##
+# Cloud Storage
+#
+resource "random_id" "bucket_main_suffix" {
+  keepers = {
+    # Generate a new id each time we switch to a new Project ID
+    ami_id = var.project_id
+  }
+  byte_length = 8
+}
+
+resource "google_storage_bucket" "main" {
+  name          = "neg-kws-cleaner-${random_id.bucket_main_suffix.hex}"
+  location      = var.location
+  storage_class = "STANDARD"
+  force_destroy = true
+  uniform_bucket_level_access = true
+  depends_on = [null_resource.enable_cloud_apis]
+}
+resource "google_storage_bucket_iam_member" "member" {
+  bucket = google_storage_bucket.main.name
+  role = "roles/storage.admin"
+  member = "serviceAccount:${google_service_account.main.email}"
+}
+
+##
 # Vertex AI
 #
 
@@ -90,6 +115,7 @@ resource "google_cloud_run_v2_service" "default" {
   template {
     containers {
       image = "gcr.io/${var.project_id}/negatives:v1"
+      timeout = 1800
 
       env {
         name = "port"
@@ -109,6 +135,11 @@ resource "google_cloud_run_v2_service" "default" {
       env {
         name = "GOOGLE_VERTEXAI_API_KEY"
         value = google_apikeys_key.vertexai.key_string
+      }
+
+      env {
+        name = "DEFAULT_BUCKET_NAME"
+        value = google_storage_bucket.main.name
       }
       resources {
         limits = {

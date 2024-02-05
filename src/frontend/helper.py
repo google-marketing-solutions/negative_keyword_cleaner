@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import streamlit as st
-from utils.config import is_appengine, Config
+from utils.config import is_cloudrun, Config
 
 
 def customize_css():
@@ -33,7 +33,7 @@ def initialize_session_state():
     if "updating_config" not in st.session_state:
         st.session_state.updating_config = None
     if "config" not in st.session_state:
-        st.session_state.config = Config.from_gcs() if is_appengine() else Config.from_disk()
+        st.session_state.config = Config.from_gcs() if is_cloudrun() else Config.from_disk()
     if "loaded_kws" not in st.session_state:
         st.session_state.loaded_kws = []
     if "batch_size" not in st.session_state:
