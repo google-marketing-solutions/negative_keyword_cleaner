@@ -201,7 +201,7 @@ def display_page() -> None:
                     not st.session_state.valid_api_config]):
                 st.error(f"AI API token missing", icon="⚠️")
             st.toggle(
-                "Enable Gemini Pro",
+                "Enable Gemini Pro (experimental)",
                 value=st_helper.display(config.gemini_enabled),
                 key="gemini_enabled",
                 help="Your instance must be deployed outside of Europe for this feature to work",

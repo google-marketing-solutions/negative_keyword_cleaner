@@ -1,4 +1,4 @@
-resource "null_resource" "enable_cloud_apis" {
+"resource "null_resource" "enable_cloud_apis" {
   provisioner "local-exec" {
     command = "gcloud services enable serviceusage.googleapis.com cloudresourcemanager.googleapis.com iam.googleapis.com --project ${var.project_id}"
   }
@@ -115,7 +115,6 @@ resource "google_cloud_run_v2_service" "default" {
   template {
     containers {
       image = "gcr.io/${var.project_id}/negatives:v1"
-      timeout = 1800
 
       env {
         name = "port"
@@ -148,6 +147,7 @@ resource "google_cloud_run_v2_service" "default" {
         }
       }
     }
+    timeout = "1800s"
     service_account = "${google_service_account.main.email}"
     session_affinity = true
   }
@@ -186,3 +186,4 @@ resource "null_resource" "env_var_update" {
   
   depends_on = [google_cloud_run_v2_service.default]
 }
+"

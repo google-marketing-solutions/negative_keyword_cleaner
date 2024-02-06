@@ -472,14 +472,16 @@ def display_page() -> None:
 
         {facts_segment}
 
-        The decision field can only take one of the following values: {decision_allowed_values}.
-        The reason field is a free form string that explains why it decided to KEEP or REMOVE a keyword.
+        The "decision" field can only take one of the following values: {decision_allowed_values}.
+        The "reason" field is a free form string where you can explain in details why you decided to KEEP or REMOVE a keyword.
 
-        The decision to KEEP a keyword means that this keyword should be excluded from targeting.
-        The decision to REMOVE a keyword means that we want to target this keyword.
+        The "decision" to KEEP a keyword means that this keyword should be excluded from targeting.
+        The "decision" to REMOVE a keyword means that we want to target this keyword.
 
-        Given this above context and examples, score this new list of keywords with relevancy and add a detailed reason as to why you scored that way, formatted as valid YAML output according to YAML specifications:
-
+        Given the above context and examples, score all keywords from the list below for each and every element of this list.
+        Format the output in the same way as the above example and as valid YAML according to YAML specifications.
+        Here is the list of keywords:
+        
         {keywords_segment}
         """)
         prompt = PromptTemplate(
@@ -918,10 +920,12 @@ def display_page() -> None:
                 "Campaign": df_entry.campaign_name,
                 "Ad Group": df_entry.adgroup_name,
                 "Keyword": student_eval.keyword,
-                "Criterion Type": ("Negative " if df_entry.adgroup_name else "Campaign Negative ") +
-                              ("Broad" if df_entry.match_type == "BROAD" else
-                               "Phrase" if df_entry.match_type == "PHRASE" else
-                               "Exact"),
+                "Criterion Type": (
+                                      "Negative " if df_entry.adgroup_name else "Campaign Negative ") +
+                                  (
+                                      "Broad" if df_entry.match_type == "BROAD" else
+                                      "Phrase" if df_entry.match_type == "PHRASE" else
+                                      "Exact"),
                 "Status": "Removed",
                 "Student Reason": student_eval.reason,
             }
@@ -931,35 +935,32 @@ def display_page() -> None:
             if df_entry.keyword == student_eval.keyword and (
                        df_entry.campaign_name or df_entry.adgroup_id)
         ]
+
+        def get_df_values(df, keyword, columns):
+            # Fetches values for specified columns based on the keyword
+            return {col: df.loc[df['keyword'] == keyword, col].values[0] for
+                    col in columns}
+
         formatted_evals_to_keep = [
             {
-                "keyword": student_eval.keyword,
-                "student_decision": student_eval.decision,
-                "student_reason": student_eval.reason,
-                "original_keyword": df_filtered.loc[df_filtered[
-                                                        'keyword'] == student_eval.keyword, 'original_keyword'].values[
-                    0],
-                "match_type": df_filtered.loc[df_filtered[
-                                                  'keyword'] == student_eval.keyword, 'match_type'].values[
-                    0],
-                "campaign_name": df_filtered.loc[df_filtered[
-                                                     'keyword'] == student_eval.keyword, 'campaign_name'].values[
-                    0],
-                "campaign_id": df_filtered.loc[df_filtered[
-                                                   'keyword'] == student_eval.keyword, 'campaign_id'].values[
-                    0],
-                "adgroup_id": df_filtered.loc[df_filtered[
-                                                  'keyword'] == student_eval.keyword, 'adgroup_id'].values[
-                    0],
-                "adgroup_name": df_filtered.loc[df_filtered[
-                                                    'keyword'] == student_eval.keyword, 'adgroup_name'].values[
-                    0],
-                "account_id": df_filtered.loc[df_filtered[
-                                                  'keyword'] == student_eval.keyword, 'account_id'].values[
-                    0],
+                "Account": df_entry.account_name,
+                "Campaign": df_entry.campaign_name,
+                "Ad Group": df_entry.adgroup_name,
+                "Keyword": student_eval.keyword,
+                "Criterion Type": ("Broad" if df_entry.match_type == "BROAD"
+                                   else "Phrase" if df_entry.match_type == "PHRASE"
+                else "Exact"),
+                "Status": "Enabled",
+                "Student Reason": student_eval.reason,
+                **get_df_values(df_filtered, student_eval.keyword,
+                                ['original_keyword', 'campaign_id',
+                                 'adgroup_id', 'account_id'])
             }
             for student_eval in cached_scoring_kws_evals
             if student_eval.decision == models.ScoreDecision.KEEP
+            for df_entry in df_filtered.itertuples()
+            if df_entry.keyword == student_eval.keyword and (
+                       df_entry.campaign_name or df_entry.adgroup_id)
         ]
 
         df_to_remove = pd.DataFrame(formatted_evals_to_remove)
