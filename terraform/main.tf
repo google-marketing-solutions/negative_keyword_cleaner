@@ -1,4 +1,4 @@
-"resource "null_resource" "enable_cloud_apis" {
+resource "null_resource" "enable_cloud_apis" {
   provisioner "local-exec" {
     command = "gcloud services enable serviceusage.googleapis.com cloudresourcemanager.googleapis.com iam.googleapis.com --project ${var.project_id}"
   }
@@ -186,4 +186,3 @@ resource "null_resource" "env_var_update" {
   
   depends_on = [google_cloud_run_v2_service.default]
 }
-"
