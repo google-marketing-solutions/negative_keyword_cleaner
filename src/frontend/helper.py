@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import streamlit as st
+
 from utils.config import is_cloudrun, Config
+from utils.event_helper import SessionStateManager
 
 
 def customize_css():
@@ -23,25 +25,18 @@ def customize_css():
         </style>""", unsafe_allow_html=True)
 
 
-def initialize_session_state():
-    if "valid_config" not in st.session_state:
-        st.session_state.valid_config = False
-    if "valid_ads_config" not in st.session_state:
-        st.session_state.valid_ads_config = False
-    if "valid_api_config" not in st.session_state:
-        st.session_state.valid_api_config = False
-    if "updating_config" not in st.session_state:
-        st.session_state.updating_config = None
-    if "config" not in st.session_state:
-        st.session_state.config = Config.from_gcs() if is_cloudrun() else Config.from_disk()
-    if "loaded_kws" not in st.session_state:
-        st.session_state.loaded_kws = []
-    if "batch_size" not in st.session_state:
-        st.session_state.batch_size = 15
-
-
-def display(value):
-    if value:
-        return value
-    else:
-        return ''
+def initialize_session_state(state_manager: SessionStateManager):
+    state_manager.initialize("valid_config", False)
+    state_manager.initialize("valid__api_config", False)
+    state_manager.initialize("valid_ads_config", False)
+    state_manager.initialize("valid_general_config", False)
+    state_manager.initialize("updating_config", None)
+    state_manager.initialize("loaded_kws", [])
+    if "config" not in state_manager.list_keys():
+        if is_cloudrun():
+            state_manager.set("config", Config.from_gcs())
+        else:
+            state_manager.set("config", Config.from_disk())
+    if "batch_size" not in state_manager.list_keys():
+        batch_size = state_manager.get("config").batch_size
+        state_manager.set("batch_size", batch_size)

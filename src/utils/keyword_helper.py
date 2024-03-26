@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections.abc import MutableSequence
-from enum import Enum
 import re
+from enum import Enum
 from typing import Sequence, Union
 
 from gaarf.api_clients import GoogleAdsApiClient
@@ -26,8 +25,7 @@ from google.api_core import exceptions
 from utils import auth
 from utils.config import Config
 from utils.gaarf_queries import CustomerNames, AdgroupNegativeKeywords, \
-    CampaignNegativeKeywords, KeywordLevel, AccountNegativeKeywords, \
-    CampaignsForSharedSets
+    CampaignNegativeKeywords, KeywordLevel
 
 _GOOGLE_ADS_API_VERSION = "v15"
 
@@ -48,7 +46,8 @@ def get_customer_ids(ads_client: GoogleAdsApiClient,
     Args:
         ads_client: GoogleAdsApiClient used for connection.
         customer_id: MCC account_id.
-        custom_query: GAQL query used to reduce the number of customer_ids.
+        customer_ids_query: The query to be executed for the aforementioned MCC account.
+
     Returns:
         All customer_ids from MCC satisfying the condition.
     """

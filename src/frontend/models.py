@@ -1,23 +1,22 @@
-from collections import OrderedDict
 import dataclasses
 import enum
 import logging
 import random
 import textwrap
+from collections import OrderedDict
 from typing import Optional, Any, Dict, List
-
-from bs4 import BeautifulSoup
-from langchain.prompts import PromptTemplate
-from langchain.chains.summarize import load_summarize_chain
-from langchain.docstore.document import Document
-from langchain.llms.base import LLM
-from langchain.text_splitter import CharacterTextSplitter
 
 import pandas as pd
 import requests
-from requests.exceptions import HTTPError, SSLError
 import streamlit as st
 import yaml
+from bs4 import BeautifulSoup
+from langchain.chains.summarize import load_summarize_chain
+from langchain.docstore.document import Document
+from langchain.llms.base import LLM
+from langchain.prompts import PromptTemplate
+from langchain.text_splitter import CharacterTextSplitter
+from requests.exceptions import HTTPError, SSLError
 
 logger = logging.getLogger(__name__)
 

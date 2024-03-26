@@ -14,9 +14,9 @@
 
 import os
 import pathlib
-import yaml
 from dataclasses import dataclass, asdict
 
+import yaml
 from google.cloud import storage
 from google.cloud.exceptions import NotFound
 

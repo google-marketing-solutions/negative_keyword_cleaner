@@ -13,13 +13,15 @@
 # limitations under the License.
 
 import logging
+
 import streamlit as st
 
-import frontend.helper as st_helper
 from utils import auth
-from utils.config import is_cloudrun, Config
+from utils.config import is_cloudrun
+from utils.event_helper import SessionStateManager
 
 logger = logging.getLogger("streamlit")
+state_manager = SessionStateManager()
 
 _CONFIG_CREDENTIALS = 1
 _CONFIG_ADS = 2
@@ -39,23 +41,23 @@ def validate_setup() -> None:
     Validates the application setup by checking various configuration parameters.
     Updates the session state to reflect the validity of different configuration sections.
     """
-    config = st.session_state.config
-    st.session_state.valid_ads_config = False
-    st.session_state.valid_api_config = False
-    st.session_state.valid_general_config = False
+    config = state_manager.get("config")
+    state_manager.set("valid_ads_config", False)
+    state_manager.set("valid_api_config", False)
+    state_manager.set("valid_general_config", False)
 
     # Validate Ads Settings
     if config.login_customer_id and config.developer_token:
-        st.session_state.valid_ads_config = True
+        state_manager.set("valid_ads_config", True)
 
     # Validate API Settings
-    if (
-            config.gemini_enabled and config.google_api_key) or config.openai_api_key or config.google_api_key:
-        st.session_state.valid_api_config = True
+    if ((config.gemini_enabled and config.google_api_key)
+            or config.openai_api_key or config.google_api_key):
+        state_manager.set("valid_api_config", True)
 
     # Validate Tool Settings
     if config.batch_size:
-        st.session_state.valid_general_config = True
+        state_manager.set("valid_general_config", True)
 
     config_updated = False
 
@@ -65,11 +67,12 @@ def validate_setup() -> None:
     if config_updated:
         _save_config(config)
 
-    st.session_state.valid_config = all([
-        st.session_state.valid_ads_config,
-        st.session_state.valid_api_config,
-        st.session_state.valid_general_config,
+    is_valid_config = all([
+        state_manager.get("valid_ads_config"),
+        state_manager.get("valid_api_config"),
+        state_manager.get("valid_general_config")
     ])
+    state_manager.set("valid_config", is_valid_config)
 
 
 def _save_config(config) -> None:
@@ -92,8 +95,8 @@ def update_config(updating_config: str) -> None:
     Parameters:
     updating_config (str): The configuration section being updated.
     """
-    st.session_state.updating_config = updating_config
-    st.session_state.valid_config = False
+    state_manager.set("updating_config", updating_config)
+    state_manager.set("valid_config", False)
 
 
 def save_ads_config(config) -> None:
@@ -146,18 +149,18 @@ def save_general_config(config) -> None:
     validate_setup()
 
 
-def display_page() -> None:
+def display_page(state_manager: SessionStateManager) -> None:
     """
     Display the application settings page.
     """
-    st.subheader("App Settings")
+    st.header("App Settings")
 
     auth.authenticate_user()
 
-    if st.session_state.valid_config:
+    if state_manager.get("valid_config"):
         st.success("Application successfully setup ✅")
 
-    config = st.session_state.config
+    config = state_manager.get("config")
     modify_ads_config = any([
         not st.session_state.valid_ads_config,
         st.session_state.updating_config == _CONFIG_ADS])
@@ -175,13 +178,13 @@ def display_page() -> None:
                 st.error(f"Google Ads configuration missing", icon="⚠️")
             st.text_input(
                 "MCC ID",
-                value=st_helper.display(config.login_customer_id),
+                value=config.login_customer_id,
                 key="login_customer_id",
                 disabled=not modify_ads_config,
                 help="Google Ads MCC account ID. You can set it both with or without hyphens XXX-XXX-XXXX")
             st.text_input(
                 "Google Ads API Developer Token",
-                value=st_helper.display(config.developer_token),
+                value=config.developer_token,
                 key="developer_token",
                 disabled=not modify_ads_config,
                 help=DEV_TOKEN_HELP)
@@ -193,7 +196,8 @@ def display_page() -> None:
                     args=[st.session_state.config])
             else:
                 st.form_submit_button(
-                    "Edit", on_click=update_config, args=[_CONFIG_ADS])
+                    "Edit", on_click=update_config,
+                    args=[_CONFIG_ADS])
 
     with st.expander("**Large Language Model APIs**", modify_api_config):
         with st.form("API"):
@@ -202,20 +206,20 @@ def display_page() -> None:
                 st.error(f"AI API token missing", icon="⚠️")
             st.toggle(
                 "Enable Gemini Pro (experimental)",
-                value=st_helper.display(config.gemini_enabled),
+                value=config.gemini_enabled,
                 key="gemini_enabled",
                 help="Your instance must be deployed outside of Europe for this feature to work",
                 disabled=not modify_api_config)
             st.text_input(
                 "Google API Key",
-                value=st_helper.display(config.google_api_key),
+                value=config.google_api_key,
                 key="google_api_key",
                 disabled=not modify_api_config,
                 type="password")
 
             st.text_input(
                 "OpenAI API Key",
-                value=st_helper.display(config.openai_api_key),
+                value=config.openai_api_key,
                 key="openai_api_key",
                 disabled=not modify_api_config,
                 type="password")
@@ -227,7 +231,8 @@ def display_page() -> None:
                     args=[st.session_state.config])
             else:
                 st.form_submit_button(
-                    "Edit", on_click=update_config, args=[_CONFIG_AI_API])
+                    "Edit", on_click=update_config,
+                    args=[_CONFIG_AI_API])
 
     with st.expander("**General Settings**", modify_general_config):
         with st.form("Tool"):
@@ -236,7 +241,8 @@ def display_page() -> None:
                 st.error(f"Incorrect tool configuration", icon="⚠️")
 
             st.number_input("Batch size", min_value=0, max_value=20,
-                            value=st_helper.display(config.batch_size),
+                            value=config.batch_size,
+                            key="batch_size",
                             step=1,
                             help="Number of keywords to review per batch",
                             disabled=not modify_general_config)
@@ -248,4 +254,5 @@ def display_page() -> None:
                     args=[st.session_state.config])
             else:
                 st.form_submit_button(
-                    "Edit", on_click=update_config, args=[_CONFIG_GENERAL])
+                    "Edit", on_click=update_config,
+                    args=[_CONFIG_GENERAL])

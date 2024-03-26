@@ -1,4 +1,4 @@
-streamlit
+streamlit==1.32.2
 google-api-python-client
 google-ads
 google-ads-api-report-fetcher
@@ -12,10 +12,9 @@ pyyaml
 beautifulsoup4
 tiktoken
 transformers
-streamlit-lottie
 streamlit-elements
 PyJWT
-git+https://github.com/dulacp/st_oauth.git@52afffa22b00637b9b2199eaeddce449efbf044f#egg=st_oauth
+git+https://github.com/FrancoisPerez/st_oauth.git
 matplotlib
 google-auth-oauthlib
 google-auth-httplib2

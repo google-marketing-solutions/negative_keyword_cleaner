@@ -12,15 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import frontend.settings_ui as settings_ui
-import frontend.helper as st_helper
-
 import streamlit as st
+
+import frontend.helper as st_helper
+import frontend.settings_ui as settings_ui
+from utils.event_helper import SessionStateManager
 
 with open('src/frontend/style/style.css') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
-st_helper.initialize_session_state()
+state_manager = SessionStateManager()
+
+st_helper.initialize_session_state(state_manager)
 st_helper.customize_css()
 settings_ui.validate_setup()
-settings_ui.display_page()
+settings_ui.display_page(state_manager)

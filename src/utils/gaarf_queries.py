@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from enum import Enum
+
 from gaarf.base_query import BaseQuery
 
 
