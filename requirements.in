@@ -1,9 +1,10 @@
-streamlit==1.32.2
+streamlit>=1.34.0
 google-api-python-client
 google-ads
 google-ads-api-report-fetcher
 tenacity
 langchain
+langchain-openai
 langchain-google-genai
 langchain-google-vertexai
 watchdog
@@ -14,7 +15,7 @@ tiktoken
 transformers
 streamlit-elements
 PyJWT
-git+https://github.com/FrancoisPerez/st_oauth.git
+git+https://github.com/FrancoisPerez/st_oauth.git@v1.1#egg=st_oauth
 matplotlib
 google-auth-oauthlib
 google-auth-httplib2

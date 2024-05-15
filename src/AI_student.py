@@ -21,13 +21,11 @@ from utils.event_helper import SessionStateManager
 
 # The Page UI starts here
 st.set_page_config(
-    page_title="Negative Keyword Cleaner",
-    page_icon="🧑‍🎓",
-    layout="wide"
+    page_title="Negative Keyword Cleaner", page_icon="🧑‍🎓", layout="wide"
 )
 
-with open('src/frontend/style/style.css') as f:
-    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+with open("src/frontend/style/style.css") as f:
+  st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 state_manager = SessionStateManager()
 
@@ -36,6 +34,6 @@ st_helper.customize_css()
 settings_ui.validate_setup()
 
 if st.session_state.valid_config:
-    main_ui.display_page(state_manager)
+  main_ui.display_page(state_manager)
 else:
-    settings_ui.display_page(state_manager)
+  settings_ui.display_page(state_manager)

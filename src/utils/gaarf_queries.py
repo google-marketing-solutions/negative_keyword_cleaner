@@ -18,29 +18,30 @@ from gaarf.base_query import BaseQuery
 
 
 class KeywordLevel(Enum):
-    """
-    Enum class to represent different levels at which keywords can be applied in an advertising context.
+  """
+  Enum class to represent different levels at which keywords can be applied in an advertising context.
 
-    Attributes:
-        ACCOUNT (str): Represents the account level.
-        CAMPAIGN (str): Represents the campaign level.
-        ADGROUP (str): Represents the ad group level.
-    """
-    ACCOUNT = 'Account'
-    CAMPAIGN = 'Campaign'
-    ADGROUP = 'Adgroup'
+  Attributes:
+      ACCOUNT (str): Represents the account level.
+      CAMPAIGN (str): Represents the campaign level.
+      ADGROUP (str): Represents the ad group level.
+  """
+
+  ACCOUNT = "Account"
+  CAMPAIGN = "Campaign"
+  ADGROUP = "Adgroup"
 
 
 class CustomerNames(BaseQuery):
-    """
-    Class for querying customer names.
+  """
+  Class for querying customer names.
 
-    This class extends BaseQuery to execute a SQL query that selects the ID and descriptive name
-    of customers who are not managers and have an enabled status both at the customer and the client level.
-    """
+  This class extends BaseQuery to execute a SQL query that selects the ID and descriptive name
+  of customers who are not managers and have an enabled status both at the customer and the client level.
+  """
 
-    def __init__(self) -> None:
-        self.query_text = f"""
+  def __init__(self) -> None:
+    self.query_text = f"""
             SELECT
                 customer_client.id,
                 customer_client.descriptive_name
@@ -53,15 +54,15 @@ class CustomerNames(BaseQuery):
 
 
 class AdgroupNegativeKeywords(BaseQuery):
-    """
-    Class for querying ad group negative keywords.
+  """
+  Class for querying ad group negative keywords.
 
-    This class extends BaseQuery to execute a SQL query that selects details of negative keywords
-    at the ad group level, including the criterion ID, keyword text, match type, and other relevant information.
-    """
+  This class extends BaseQuery to execute a SQL query that selects details of negative keywords
+  at the ad group level, including the criterion ID, keyword text, match type, and other relevant information.
+  """
 
-    def __init__(self) -> None:
-        self.query_text = f"""
+  def __init__(self) -> None:
+    self.query_text = f"""
             SELECT
                 ad_group_criterion.criterion_id AS criterion_id,
                 ad_group_criterion.keyword.text AS keyword,
@@ -84,8 +85,9 @@ class AdgroupNegativeKeywords(BaseQuery):
 
 
 class CampaignNegativeKeywords(BaseQuery):
-    def __init__(self) -> None:
-        self.query_text = f"""
+
+  def __init__(self) -> None:
+    self.query_text = f"""
             SELECT
                 campaign_criterion.criterion_id AS criterion_id,
                 campaign_criterion.keyword.text AS keyword,
@@ -107,15 +109,15 @@ class CampaignNegativeKeywords(BaseQuery):
 
 
 class AccountNegativeKeywords(BaseQuery):
-    """
-    Class for querying account level negative keywords.
+  """
+  Class for querying account level negative keywords.
 
-    This class extends BaseQuery to execute a SQL query that selects details of negative keywords
-    at the account level, including shared set ID, keyword text, match type, and other related information.
-    """
+  This class extends BaseQuery to execute a SQL query that selects details of negative keywords
+  at the account level, including shared set ID, keyword text, match type, and other related information.
+  """
 
-    def __init__(self) -> None:
-        self.query_text = f"""
+  def __init__(self) -> None:
+    self.query_text = f"""
             SELECT
                 shared_set.id AS criterion_id,
                 'True' AS is_negative,
@@ -138,15 +140,15 @@ class AccountNegativeKeywords(BaseQuery):
 
 
 class CampaignsForSharedSets(BaseQuery):
-    """
-    Class for querying campaigns that are associated with specific shared sets.
+  """
+  Class for querying campaigns that are associated with specific shared sets.
 
-    This class extends BaseQuery to execute a SQL query that selects details of campaigns
-    linked to given shared sets, which are identified by their resource names.
-    """
+  This class extends BaseQuery to execute a SQL query that selects details of campaigns
+  linked to given shared sets, which are identified by their resource names.
+  """
 
-    def __init__(self, campaign_resource_names) -> None:
-        self.query_text = f"""
+  def __init__(self, campaign_resource_names) -> None:
+    self.query_text = f"""
             SELECT
               campaign.id,
               campaign.name,

@@ -3,36 +3,36 @@ name = "aistudent"
 version = "0.1.0"
 description = ""
 authors = [
-  {name = "Pierre Dulac", email = "dulacp@google.com"},
-  {name = "Mariam Youssef", email = "mariamyoussef@google.com"},
-  {name = "François Pérez", email = "fraperez@google.com"},
+    { name = "Pierre Dulac", email = "dulacp@google.com" },
+    { name = "Mariam Youssef", email = "mariamyoussef@google.com" },
+    { name = "François Pérez", email = "fraperez@google.com" },
 ]
 readme = "README.md"
 classifiers = ["Private :: Do Not Upload"]
 dependencies = [
-  "streamlit",
-  "tenacity",
-  "langchain",
-  "watchdog",
-  "openai",
-  "pyyaml",
-  "beautifulsoup4",
-  "tiktoken",
-  "transformers",
-  "streamlit-elements",
-  "matplotlib",
-  "google-auth-oauthlib",
-  "google-auth-httplib2",
-  "alive-progress",
+    "streamlit",
+    "tenacity",
+    "langchain",
+    "watchdog",
+    "openai",
+    "pyyaml",
+    "beautifulsoup4",
+    "tiktoken",
+    "transformers",
+    "streamlit-elements",
+    "matplotlib",
+    "google-auth-oauthlib",
+    "google-auth-httplib2",
+    "alive-progress",
 ]
 requires-python = ">=3.11"
 
 [project.optional-dependencies]
 dev = [
-  "pip-tools",
-  "isort==5.12.0",
-  "black==23.1a1",
-  "flake8==6.0.0",
+    "pip-tools",
+    "isort==5.12.0",
+    "black==23.1a1",
+    "flake8==6.0.0",
 ]
 
 [build-system]
@@ -44,3 +44,10 @@ profile = "black"
 
 [tools.setuptools]
 packages = ["frontend/*", "pages/*"]
+
+[tool.pyink]
+# Formatting configuration to follow Google style-guide
+line-length = 80
+unstable = true
+pyink-indentation = 2
+pyink-use-majority-quotes = true
