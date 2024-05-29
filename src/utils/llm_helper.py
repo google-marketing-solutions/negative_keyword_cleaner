@@ -2,7 +2,7 @@ import os
 
 import langchain_google_genai as google_genai
 import langchain_google_vertexai as google_vertexai
-from langchain_community import llms
+import langchain_openai as openai
 
 _GEMINI_MODEL = "gemini-1.5-flash-latest"
 _NON_GEMINI_MODEL = "text-bison"
@@ -33,7 +33,7 @@ def select_llm(config):
     )
   else:
     print("Picked OpenAI 3.5-turbo model for summarizing")
-    return llms.OpenAI(
+    return openai.OpenAI(
         model_name=_OPENAI_MODEL,
         temperature=0.2,
         max_tokens=1024,

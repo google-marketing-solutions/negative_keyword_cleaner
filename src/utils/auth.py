@@ -34,19 +34,21 @@ from st_oauth import st_oauth
 from st_oauth.st_oauth import _STKEY as ST_OAUTH_TOKEN_KEY
 
 # Google OAuth2.0 configuration
-AUTHORIZE_URL = os.getenv("AUTHORIZE_URL", "https://accounts.google.com/o/oauth2/auth")
-TOKEN_URL = os.getenv("TOKEN_URL", "https://oauth2.googleapis.com/token")
-REFRESH_TOKEN_URL = os.getenv(
+_AUTHORIZE_URL = os.getenv(
+    "AUTHORIZE_URL", "https://accounts.google.com/o/oauth2/auth"
+)
+_TOKEN_URL = os.getenv("TOKEN_URL", "https://oauth2.googleapis.com/token")
+_REFRESH_TOKEN_URL = os.getenv(
     "REFRESH_TOKEN_URL", "https://oauth2.googleapis.com/token"
 )
-REVOKE_TOKEN_URL = os.getenv(
+_REVOKE_TOKEN_URL = os.getenv(
     "REVOKE_TOKEN_URL", "https://accounts.google.com/o/oauth2/revoke"
 )
-JWKS_URI = os.getenv("JWKS_URI", "https://www.googleapis.com/oauth2/v3/certs")
-OAUTH_CLIENT_ID = os.getenv("OAUTH_CLIENT_ID")
-OAUTH_CLIENT_SECRET = os.getenv("OAUTH_CLIENT_SECRET")
-OAUTH_REDIRECT_URI = os.getenv("OAUTH_REDIRECT_URI")
-GOOGLE_SIGN_IN_CODE = """
+_JWKS_URI = os.getenv("JWKS_URI", "https://www.googleapis.com/oauth2/v3/certs")
+_OAUTH_CLIENT_ID = os.getenv("OAUTH_CLIENT_ID")
+_OAUTH_CLIENT_SECRET = os.getenv("OAUTH_CLIENT_SECRET")
+_OAUTH_REDIRECT_URI = os.getenv("OAUTH_REDIRECT_URI")
+_GOOGLE_SIGN_IN_CODE = """
 <button class="gsi-material-button">
   <div class="gsi-material-button-state"></div>
   <div class="gsi-material-button-content-wrapper">
@@ -65,22 +67,22 @@ GOOGLE_SIGN_IN_CODE = """
 </button>
 """
 
-print("OAUTH_REDIRECT_URI:", OAUTH_REDIRECT_URI)
+print("OAUTH_REDIRECT_URI:", _OAUTH_REDIRECT_URI)
 
 
 def authenticate_user():
   oauth2_params = {
-      "authorization_endpoint": AUTHORIZE_URL,
-      "token_endpoint": TOKEN_URL,
-      "redirect_uri": OAUTH_REDIRECT_URI,
-      "jwks_uri": JWKS_URI,
-      "client_id": OAUTH_CLIENT_ID,
-      "client_secret": OAUTH_CLIENT_SECRET,
+      "authorization_endpoint": _AUTHORIZE_URL,
+      "token_endpoint": _TOKEN_URL,
+      "redirect_uri": _OAUTH_REDIRECT_URI,
+      "jwks_uri": _JWKS_URI,
+      "client_id": _OAUTH_CLIENT_ID,
+      "client_secret": _OAUTH_CLIENT_SECRET,
       "scope": "email profile https://www.googleapis.com/auth/adwords",
-      "audience": OAUTH_CLIENT_ID,
+      "audience": _OAUTH_CLIENT_ID,
       "identity_field_in_token": "sub",
   }
-  st_oauth(oauth2_params, label=GOOGLE_SIGN_IN_CODE)
+  st_oauth(oauth2_params, label=_GOOGLE_SIGN_IN_CODE)
 
 
 def get_access_token():

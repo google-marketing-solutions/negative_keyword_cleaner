@@ -50,7 +50,10 @@ class SessionStateManager:
     return list(st.session_state.keys())
 
 
-def reset_evaluations(state_manager: SessionStateManager) -> None:
+state_manager = SessionStateManager()
+
+
+def reset_evaluations() -> None:
   """
   Reset the evaluations in the session state by initializing it to an empty OrderedDict.
   This is used to clear any existing evaluations stored in the session state.
@@ -58,7 +61,7 @@ def reset_evaluations(state_manager: SessionStateManager) -> None:
   state_manager.set("evaluations", OrderedDict())
 
 
-def reset_eval_pairs(state_manager: SessionStateManager) -> None:
+def reset_eval_pairs() -> None:
   """
   Reset the eval_pairs in the session state by initializing it to an empty OrderedDict.
   This is used to clear any existing eval_pairs stored in the session state.
@@ -69,7 +72,6 @@ def reset_eval_pairs(state_manager: SessionStateManager) -> None:
 def _save_human_eval(
     human_eval: models.KeywordEvaluation,
     llm_eval: models.KeywordEvaluation,
-    state_manager: SessionStateManager,
 ) -> None:
   """
   Save the human evaluation alongside the corresponding LLM evaluation.
@@ -100,8 +102,7 @@ def _save_human_eval(
 def define_handler_scoring(
     llm_eval: models.KeywordEvaluation,
     human_agree_with_llm: bool,
-    state_manager: SessionStateManager,
-) -> Callable:
+):
   """
   Define a handler for scoring, which returns an inner function to handle the logic
   of saving human evaluations based on agreement with LLM evaluations.
@@ -125,17 +126,18 @@ def define_handler_scoring(
           ),
       )
       return
+
     human_eval = models.KeywordEvaluation(
-        keyword=llm_eval.keyword, decision=llm_eval.decision, reason=llm_eval.reason
+        keyword=llm_eval.keyword,
+        decision=llm_eval.decision,
+        reason=llm_eval.reason,
     )
-    _save_human_eval(
-        human_eval=human_eval, llm_eval=llm_eval, state_manager=state_manager
-    )
+    _save_human_eval(human_eval=human_eval, llm_eval=llm_eval)
 
   return _inner
 
 
-def handler_cancel_human_eval(state_manager: SessionStateManager) -> Callable:
+def handler_cancel_human_eval() -> Callable:
   """
   Define a handler for canceling a human evaluation.
 
@@ -154,7 +156,6 @@ def handler_cancel_human_eval(state_manager: SessionStateManager) -> Callable:
 
 def define_handler_save_human_eval(
     llm_eval: models.KeywordEvaluation,
-    state_manager: SessionStateManager,
     keyword_feedback_eval: models.KeywordEvaluation,
 ) -> Callable:
   """
@@ -174,14 +175,12 @@ def define_handler_save_human_eval(
         decision=keyword_feedback_eval.decision,
         reason=keyword_feedback_eval.reason,
     )
-    _save_human_eval(
-        human_eval=human_eval, llm_eval=llm_eval, state_manager=state_manager
-    )
+    _save_human_eval(human_eval=human_eval, llm_eval=llm_eval)
 
   return _inner
 
 
-def handler_human_decision(event, value, state_manager: SessionStateManager) -> None:
+def handler_human_decision(event, value) -> None:
   """
   Handler for setting the human decision in the evaluation.
 
@@ -194,7 +193,7 @@ def handler_human_decision(event, value, state_manager: SessionStateManager) -> 
   state_manager.set("keyword_feedback_eval", kf_eval)
 
 
-def handler_human_reason(event, state_manager: SessionStateManager) -> None:
+def handler_human_reason(event) -> None:
   """
   Handler for setting the human reason in the evaluation.
 

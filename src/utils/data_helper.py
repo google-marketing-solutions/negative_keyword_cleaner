@@ -24,7 +24,9 @@ def load_keywords(selected_customers: list) -> pd.DataFrame:
     st.error("An internal error occurred. Could not load KeywordHelper.")
     return
 
-  with st.spinner(text="Loading negative keywords... This may take a few minutes"):
+  with st.spinner(
+      text="Loading negative keywords... This may take a few minutes"
+  ):
     clean_selected_customers = [s.replace("-", "") for s in selected_customers]
     negative_kws_report = kw_helper.get_neg_keywords(clean_selected_customers)
     if not negative_kws_report:

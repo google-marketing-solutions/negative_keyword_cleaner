@@ -4,12 +4,11 @@ from streamlit_elements import mui, lazy
 from frontend import models
 from frontend.models import KeywordEvaluation
 from utils import event_helper
-from utils.event_helper import SessionStateManager
 
 
 def render_item_card(
     item: models.KeywordEvaluation,
-    state_manager: SessionStateManager,
+    state_manager: event_helper.SessionStateManager,
     keyword_feedback_eval: KeywordEvaluation = None,
     df_keywords: pd.DataFrame = None,
 ) -> None:
@@ -27,7 +26,6 @@ def render_item_card(
 
   card_style = {"display": "flex", "flexDirection": "column", "borderRadius": 3}
   card_header_style = {"background": "rgba(250, 250, 250, 0.1)"}
-
   with mui.Card(key="first_item", sx=card_style, elevation=1):
     mui.CardHeader(
         title=item.keyword,
@@ -46,7 +44,7 @@ def render_item_card(
               is_textfield=True,
               default_value=keyword_feedback_eval.reason,
               human_reason=lambda event: event_helper.handler_human_reason(
-                  event=event, state_manager=state_manager
+                  event=event
               ),
           )
           create_table_row(
@@ -55,7 +53,7 @@ def render_item_card(
               decisions=models.ScoreDecision,
               default_value=keyword_feedback_eval.decision,
               human_decision=lambda event, value: event_helper.handler_human_decision(
-                  event, value, state_manager
+                  event, value
               ),
           )
         else:
@@ -65,14 +63,12 @@ def render_item_card(
     # Add actions
     create_action_section(
         item=item,
-        state_manager=state_manager,
         keyword_feedback_eval=keyword_feedback_eval,
     )
 
 
 def create_action_section(
     item: models.KeywordEvaluation,
-    state_manager: SessionStateManager,
     keyword_feedback_eval: models.KeywordEvaluation = None,
 ):
   if (
@@ -83,7 +79,7 @@ def create_action_section(
     with mui.CardActions(disableSpacing=True, sx={"margin-top": "auto"}):
       mui.Button(
           "Cancel",
-          onClick=event_helper.handler_cancel_human_eval(state_manager=state_manager),
+          onClick=event_helper.handler_cancel_human_eval(),
           sx={"margin-right": "auto", "color": "#999999"},
       )
       mui.Button(
@@ -91,30 +87,27 @@ def create_action_section(
           color="success",
           onClick=event_helper.define_handler_save_human_eval(
               llm_eval=item,
-              state_manager=state_manager,
               keyword_feedback_eval=keyword_feedback_eval,
           ),
       )
   else:
     # Generic actions
     with mui.CardActions(disableSpacing=True, sx={"margin-top": "auto"}):
-      mui.button(
+      mui.Button(
           "Disagree with Student",
           color="error",
           onClick=event_helper.define_handler_scoring(
-              llm_eval=item,
-              human_agree_with_llm=False,
-              state_manager=state_manager,
+              llm_eval=item, human_agree_with_llm=False
           ),
           sx={"margin-right": "auto"},
       )
+
       mui.Button(
           "Agree with Student",
           color="success",
           onClick=event_helper.define_handler_scoring(
               llm_eval=item,
               human_agree_with_llm=True,
-              state_manager=state_manager,
           ),
       )
 
@@ -123,7 +116,6 @@ def create_table_row(
     label,
     content,
     is_textfield=False,
-    state_manager=None,
     default_value=None,
     human_reason=None,
     human_decision=None,
@@ -168,6 +160,8 @@ def create_table(rows, key=None):
   with mui.Table(key=key):
     with mui.TableBody():
       for row in rows:
-        with mui.TableRow(sx={"&:last-child td, &:last-child th": {"border": 0}}):
+        with mui.TableRow(
+            sx={"&:last-child td, &:last-child th": {"border": 0}}
+        ):
           for cell in row:
             mui.TableCell()(mui.Typography(cell))

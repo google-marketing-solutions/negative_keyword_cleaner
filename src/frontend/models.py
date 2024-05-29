@@ -33,16 +33,14 @@ _HTML_EXCLUDE_TAGS = [
     "style",
 ]
 
-_SUMMARY_PROMPT_TEMPLATE = textwrap.dedent(
-    """\
+_SUMMARY_PROMPT_TEMPLATE = textwrap.dedent("""\
     Use the following company homepage and personal knowledge to write a concise bullet point summary.
     Explain what they sell as product, service or added value:
 
     {text}
 
     CONSCISE SUMMARY IN BULLET POINTS:
-    """
-)
+    """)
 
 
 def get_random_state(force_new: bool = False) -> int:
@@ -80,7 +78,10 @@ def fetch_landing_page_text(url: str) -> List[Document]:
     #
     # To avoid this, we are mimicking an actual browser
     headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+            " (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+        ),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
         "Accept-Language": "en-US,en;q=0.9",
         "Connection": "keep-alive",
@@ -153,7 +154,9 @@ def summarize_text(_docs: Document, _llm: LLM, verbose: bool = False) -> str:
   Returns:
   str: The summarized text.
   """
-  prompt = PromptTemplate(template=_SUMMARY_PROMPT_TEMPLATE, input_variables=["text"])
+  prompt = PromptTemplate(
+      template=_SUMMARY_PROMPT_TEMPLATE, input_variables=["text"]
+  )
   chain = summarize.load_summarize_chain(
       _llm, chain_type="map_reduce", map_prompt=prompt, verbose=verbose
   )
@@ -229,7 +232,9 @@ class KeywordEvaluation:
   def from_dict(cls, data: dict[str, str]):
     return cls(
         keyword=data.get("keyword", data.get("Keyword")),
-        decision=ScoreDecision(data.get("decision", ScoreDecision.UNKNOWN.value)),
+        decision=ScoreDecision(
+            data.get("decision", ScoreDecision.UNKNOWN.value)
+        ),
         reason=data.get("reason", "Unspecified"),
     )
 
@@ -270,7 +275,9 @@ def sample_batch(
   )
 
 
-def format_scoring_fragment(evaluations: OrderedDict[str, KeywordEvaluation]) -> str:
+def format_scoring_fragment(
+    evaluations: OrderedDict[str, KeywordEvaluation],
+) -> str:
   """
   Formats the given evaluations for the LLM.
 

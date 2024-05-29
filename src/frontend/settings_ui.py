@@ -70,13 +70,11 @@ def validate_setup() -> None:
   if config_updated:
     _save_config(config)
 
-  is_valid_config = all(
-      [
-          state_manager.get("valid_ads_config"),
-          state_manager.get("valid_api_config"),
-          state_manager.get("valid_general_config"),
-      ]
-  )
+  is_valid_config = all([
+      state_manager.get("valid_ads_config"),
+      state_manager.get("valid_api_config"),
+      state_manager.get("valid_general_config"),
+  ])
   state_manager.set("valid_config", is_valid_config)
 
 
@@ -170,40 +168,35 @@ def display_page(state_manager: SessionStateManager) -> None:
     st.success("Application successfully setup ✅")
 
   config = state_manager.get("config")
-  modify_ads_config = any(
-      [
-          not st.session_state.valid_ads_config,
-          st.session_state.updating_config == _CONFIG_ADS,
-      ]
-  )
-  modify_api_config = any(
-      [
-          not st.session_state.valid_api_config,
-          st.session_state.updating_config == _CONFIG_AI_API,
-      ]
-  )
-  modify_general_config = any(
-      [
-          not st.session_state.valid_general_config,
-          st.session_state.updating_config == _CONFIG_GENERAL,
-      ]
-  )
+  modify_ads_config = any([
+      not st.session_state.valid_ads_config,
+      st.session_state.updating_config == _CONFIG_ADS,
+  ])
+  modify_api_config = any([
+      not st.session_state.valid_api_config,
+      st.session_state.updating_config == _CONFIG_AI_API,
+  ])
+  modify_general_config = any([
+      not st.session_state.valid_general_config,
+      st.session_state.updating_config == _CONFIG_GENERAL,
+  ])
 
   with st.expander("**Google Ads**", expanded=modify_ads_config):
     with st.form("Google Ads"):
-      if all(
-          [
-              not st.session_state.updating_config,
-              not st.session_state.valid_ads_config,
-          ]
-      ):
+      if all([
+          not st.session_state.updating_config,
+          not st.session_state.valid_ads_config,
+      ]):
         st.error(f"Google Ads configuration missing", icon="⚠️")
       st.text_input(
           "MCC ID",
           value=config.login_customer_id,
           key="login_customer_id",
           disabled=not modify_ads_config,
-          help="Google Ads MCC account ID. You can set it both with or without hyphens XXX-XXX-XXXX",
+          help=(
+              "Google Ads MCC account ID. You can set it both with or without"
+              " hyphens XXX-XXX-XXXX"
+          ),
       )
       st.text_input(
           "Google Ads API Developer Token",
@@ -218,16 +211,16 @@ def display_page(state_manager: SessionStateManager) -> None:
             "Save", on_click=save_ads_config, args=[st.session_state.config]
         )
       else:
-        st.form_submit_button("Edit", on_click=update_config, args=[_CONFIG_ADS])
+        st.form_submit_button(
+            "Edit", on_click=update_config, args=[_CONFIG_ADS]
+        )
 
   with st.expander("**Large Language Model APIs**", modify_api_config):
     with st.form("API"):
-      if all(
-          [
-              not st.session_state.updating_config,
-              not st.session_state.valid_api_config,
-          ]
-      ):
+      if all([
+          not st.session_state.updating_config,
+          not st.session_state.valid_api_config,
+      ]):
         st.error(f"AI API token missing", icon="⚠️")
       st.toggle(
           "Enable Gemini 1.5 Pro (experimental)",
@@ -256,16 +249,16 @@ def display_page(state_manager: SessionStateManager) -> None:
             "Save", on_click=save_api_config, args=[st.session_state.config]
         )
       else:
-        st.form_submit_button("Edit", on_click=update_config, args=[_CONFIG_AI_API])
+        st.form_submit_button(
+            "Edit", on_click=update_config, args=[_CONFIG_AI_API]
+        )
 
   with st.expander("**General Settings**", modify_general_config):
     with st.form("Tool"):
-      if all(
-          [
-              not st.session_state.updating_config,
-              not st.session_state.valid_general_config,
-          ]
-      ):
+      if all([
+          not st.session_state.updating_config,
+          not st.session_state.valid_general_config,
+      ]):
         st.error(f"Incorrect tool configuration", icon="⚠️")
 
       st.number_input(
@@ -284,4 +277,6 @@ def display_page(state_manager: SessionStateManager) -> None:
             "Save", on_click=save_general_config, args=[st.session_state.config]
         )
       else:
-        st.form_submit_button("Edit", on_click=update_config, args=[_CONFIG_GENERAL])
+        st.form_submit_button(
+            "Edit", on_click=update_config, args=[_CONFIG_GENERAL]
+        )

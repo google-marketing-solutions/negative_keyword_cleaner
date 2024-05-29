@@ -17,7 +17,7 @@ import streamlit as st
 import frontend.helper as st_helper
 from frontend import main_ui
 from frontend import settings_ui
-from utils.event_helper import SessionStateManager
+from utils import event_helper
 
 # The Page UI starts here
 st.set_page_config(
@@ -27,7 +27,7 @@ st.set_page_config(
 with open("src/frontend/style/style.css") as f:
   st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-state_manager = SessionStateManager()
+state_manager = event_helper.SessionStateManager()
 
 st_helper.initialize_session_state(state_manager)
 st_helper.customize_css()

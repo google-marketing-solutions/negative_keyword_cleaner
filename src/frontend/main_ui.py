@@ -41,7 +41,9 @@ _DEBUG_SCORING_LIMIT = -1  # No limit: -1
 _URL_REGEX = r"^((http|https)://)[-a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)$"
 
 
-def _set_manual_context(state_manager: SessionStateManager) -> Callable[[], None]:
+def _set_manual_context(
+    state_manager: SessionStateManager,
+) -> Callable[[], None]:
   def _set_manual_context_callback():
     state_manager.set("manual_context", True)
     # st.session_state.company_homepage_url = "Manual mode, please enter you context below"
@@ -68,7 +70,8 @@ def display_page(state_manager: SessionStateManager) -> None:
   #
 
   with st.expander(
-      "1. Advertiser Information", expanded=state_manager.get("context_open", True)
+      "1. Advertiser Information",
+      expanded=state_manager.get("context_open", True),
   ):
     company_homepage_url = st.text_input(
         "Company Homepage URL",
@@ -85,17 +88,21 @@ def display_page(state_manager: SessionStateManager) -> None:
           icon="🧑‍🎓",
       )
       st.write("If you want to give me advertiser information directly")
-      st.button("Add context manually", on_click=_set_manual_context(state_manager))
+      st.button(
+          "Add context manually", on_click=_set_manual_context(state_manager)
+      )
       st.stop()
     else:
-      if len(company_homepage_url) > 0 or not state_manager.get("manual_context"):
-        if not re.match(_URL_REGEX, company_homepage_url) and not state_manager.get(
-            "manual_context"
-        ):
+      if len(company_homepage_url) > 0 or not state_manager.get(
+          "manual_context"
+      ):
+        if not re.match(
+            _URL_REGEX, company_homepage_url
+        ) and not state_manager.get("manual_context"):
           state_manager.set("company_homepage_url", None)
           company_homepage_url = None
           st.error(
-              "The URL is not in a valid format. Please check it and " "try again."
+              "The URL is not in a valid format. Please check it and try again."
           )
           st.stop()
         else:
@@ -138,7 +145,10 @@ def display_page(state_manager: SessionStateManager) -> None:
 
       exclude_pitch = st.text_area(
           "❌ [Negative prompt] Exclude summary",
-          placeholder="Describe what you don't want to target ads for (your brand, competitor's names, other non relevant topics ...)",
+          placeholder=(
+              "Describe what you don't want to target ads for (your brand,"
+              " competitor's names, other non relevant topics ...)"
+          ),
           height=50,
       )
 
@@ -151,7 +161,9 @@ def display_page(state_manager: SessionStateManager) -> None:
     state_manager.set("epoch_eval_pairs", [])
 
   if not state_manager.get("context_ready"):
-    st.button("Continue with this context", on_click=_handle_continue_with_context)
+    st.button(
+        "Continue with this context", on_click=_handle_continue_with_context
+    )
     st.stop()
   elif state_manager.get("context_open"):
     state_manager.set("context_open", False)
@@ -206,7 +218,8 @@ def display_page(state_manager: SessionStateManager) -> None:
     return f"{str_cid[:3]}-{str_cid[3:6]}-{str_cid[6:]}"
 
   with st.expander(
-      "2. Load Customers", expanded=state_manager.get("load_customers_open", True)
+      "2. Load Customers",
+      expanded=state_manager.get("load_customers_open", True),
   ):
     df = data_helper.load_customers()
     selected_customers = st.multiselect(
@@ -233,12 +246,15 @@ def display_page(state_manager: SessionStateManager) -> None:
     df = data_helper.load_keywords(selected_customers).query('keyword != ""')
     number_of_neg_kw: str = "{:.0f}".format(len(df))
     st.success(
-        f"I've loaded {number_of_neg_kw} negative keywords from all campaigns. Filter only the relevant campaigns!",
+        f"I've loaded {number_of_neg_kw} negative keywords from all campaigns."
+        " Filter only the relevant campaigns!",
         icon="🎓",
     )
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Total negative keywords", "{:.0f}".format(len(df)).replace(",", " "))
+    col1.metric(
+        "Total negative keywords", "{:.0f}".format(len(df)).replace(",", " ")
+    )
     col2.metric(
         "Total unique keywords",
         "{:.0f}".format(df.keyword.nunique()).replace(",", " "),
@@ -289,7 +305,9 @@ def display_page(state_manager: SessionStateManager) -> None:
     state_manager.set("filters_ready", True)
 
   if not state_manager.get("filters_ready", False):
-    st.button("Continue with these filters", on_click=_handle_continue_with_filters)
+    st.button(
+        "Continue with these filters", on_click=_handle_continue_with_filters
+    )
     st.stop()
 
   def _score_batch_evals() -> None:
@@ -326,9 +344,9 @@ def display_page(state_manager: SessionStateManager) -> None:
   # 3. Samples and Scores the sampled batch.
   #
   if "evaluations" not in state_manager.list_keys():
-    event_helper.reset_evaluations(state_manager)
+    event_helper.reset_evaluations()
   if "eval_pairs" not in state_manager.list_keys():
-    event_helper.reset_eval_pairs(state_manager)
+    event_helper.reset_eval_pairs()
 
   evaluations = state_manager.get("evaluations")
 
@@ -350,8 +368,7 @@ def display_page(state_manager: SessionStateManager) -> None:
         df_keywords["keyword"].values.tolist(), ensure_ascii=False
     )
 
-    template = textwrap.dedent(
-        """\
+    template = textwrap.dedent("""\
             You are a machine learning model that analyzes negative keywords for Google Ads campaigns. For each provided negative keyword, determine if it should be KEPT (to prevent ads from showing for that search term) or REMOVED (to allow ads to show for searches containing that term).
 
             Provide your analysis in the following YAML format for each keyword:
@@ -381,8 +398,7 @@ def display_page(state_manager: SessionStateManager) -> None:
 
             Analyze the following keywords:
             {keywords_segment}
-            """
-    )
+            """)
     prompt = prompts.PromptTemplate(
         template=template,
         input_variables=[
@@ -399,7 +415,9 @@ def display_page(state_manager: SessionStateManager) -> None:
     scored_keywords = state_manager.get("scored_keywords", None)
     if not scored_keywords:
       with st.spinner("Scoring a new batch of keywords..."):
-        llm_chain = chains.LLMChain(prompt=prompt, llm=scoring_llm, verbose=True)
+        llm_chain = chains.LLMChain(
+            prompt=prompt, llm=scoring_llm, verbose=True
+        )
         print(
             llm_chain,
             company_pitch,
@@ -408,19 +426,17 @@ def display_page(state_manager: SessionStateManager) -> None:
             formatted_keywords,
         )
 
-        scored_keywords = llm_chain.run(
-            {
-                "company_segment": "\n\n".join(
-                    filter(None, [company_pitch, exclude_pitch])
-                ),
-                "facts_segment": formatted_facts,
-                "keywords_segment": formatted_keywords,
-                "decision_allowed_values": ", ".join(
-                    x.value for x in models.ScoreDecision
-                ),
-                "batch_size": state_manager.get("batch_size"),
-            }
-        )
+        scored_keywords = llm_chain.run({
+            "company_segment": "\n\n".join(
+                filter(None, [company_pitch, exclude_pitch])
+            ),
+            "facts_segment": formatted_facts,
+            "keywords_segment": formatted_keywords,
+            "decision_allowed_values": ", ".join(
+                x.value for x in models.ScoreDecision
+            ),
+            "batch_size": state_manager.get("batch_size"),
+        })
         state_manager.set("scored_keywords", scored_keywords)
 
     logger.error(scored_keywords)
@@ -441,7 +457,7 @@ def display_page(state_manager: SessionStateManager) -> None:
     else:
       st.success(
           f"I've learned from {len(evaluations)} human evaluations. "
-          f"Keep on correcting me to improve my accuracy!",
+          "Keep on correcting me to improve my accuracy!",
           icon="🎓",
       )
 
@@ -505,7 +521,8 @@ def display_page(state_manager: SessionStateManager) -> None:
       # Computes each batch evaluation accuracy.
       epoch_eval_pairs = state_manager.get("epoch_eval_pairs", [])
       epoch_accurracies = [
-          sum(p.llm_decision == p.human_decision for p in eval_pair) / len(eval_pair)
+          sum(p.llm_decision == p.human_decision for p in eval_pair)
+          / len(eval_pair)
           for eval_pair in epoch_eval_pairs
       ]
       print("epoch_accurracies:", epoch_accurracies)
@@ -547,12 +564,14 @@ def display_page(state_manager: SessionStateManager) -> None:
 
   count_remaining = df_filtered.keyword.nunique() - len(evaluations)
   st.header(f"Score the remaining {count_remaining:,} keywords")
-  st.markdown("**Will NOT modify your account**, it's purely a scoring procedure.")
+  st.markdown(
+      "**Will NOT modify your account**, it's purely a scoring procedure."
+  )
 
   score_remaining = st.button("Score remaining keywords", key="score_remaining")
   if score_remaining:
     scoring_progress_text = (
-        "Your fine-tuned AI-Student is now scoring " "the remaining keywords... "
+        "Your fine-tuned AI-Student is now scoring the remaining keywords... "
     )
     scoring_bar = st.progress(0, text=scoring_progress_text)
     scoring_seen_kws = set(evaluations.keys())
@@ -564,7 +583,9 @@ def display_page(state_manager: SessionStateManager) -> None:
       df_to_score = df_filtered
 
     while True:
-      random_state = state_manager.get("random_state", models.get_random_state())
+      random_state = state_manager.get(
+          "random_state", models.get_random_state()
+      )
       df_keywords = models.sample_batch(
           df_to_score,
           batch_size=50,
@@ -587,24 +608,24 @@ def display_page(state_manager: SessionStateManager) -> None:
       )
       llm_chain = chains.LLMChain(prompt=prompt, llm=scoring_llm, verbose=True)
 
-      latest_scored_keywords = llm_chain.run(
-          {
-              "company_segment": "\n\n".join(
-                  filter(None, [company_pitch, exclude_pitch])
-              ),
-              "facts_segment": formatted_facts,
-              "keywords_segment": formatted_keywords,
-              "decision_allowed_values": ", ".join(
-                  x.value for x in models.ScoreDecision
-              ),
-              "batch_size": state_manager.get("batch_size"),
-          }
-      )
+      latest_scored_keywords = llm_chain.run({
+          "company_segment": "\n\n".join(
+              filter(None, [company_pitch, exclude_pitch])
+          ),
+          "facts_segment": formatted_facts,
+          "keywords_segment": formatted_keywords,
+          "decision_allowed_values": ", ".join(
+              x.value for x in models.ScoreDecision
+          ),
+          "batch_size": state_manager.get("batch_size"),
+      })
       logger.warning(latest_scored_keywords)
 
       # Parses the results.
       try:
-        parsed_scored_keywords = models.parse_scoring_response(latest_scored_keywords)
+        parsed_scored_keywords = models.parse_scoring_response(
+            latest_scored_keywords
+        )
       except yaml.scanner.ScannerError as inst:
         # Skips this failed batch.
         logger.error(f"Failed batch with error: {inst}")
@@ -618,7 +639,9 @@ def display_page(state_manager: SessionStateManager) -> None:
       # Updates the progress bar
       curr = len(scoring_kws_evals)
       N = len(df_to_score)
-      scoring_bar.progress(curr / N, text=scoring_progress_text + f" {curr}/{N}")
+      scoring_bar.progress(
+          curr / N, text=scoring_progress_text + f" {curr}/{N}"
+      )
 
     # Keeps the results in cache
     if scoring_kws_evals:
@@ -636,8 +659,7 @@ def display_page(state_manager: SessionStateManager) -> None:
             "Keyword": student_eval.keyword,
             "Criterion Type": (
                 "Negative " if df_entry.adgroup_name else "Campaign Negative "
-            )
-            + (
+            ) + (
                 "Broad"
                 if df_entry.match_type == "BROAD"
                 else "Phrase"
@@ -656,7 +678,10 @@ def display_page(state_manager: SessionStateManager) -> None:
 
     def get_df_values(df, keyword, columns):
       # Fetches values for specified columns based on the keyword
-      return {col: df.loc[df["keyword"] == keyword, col].values[0] for col in columns}
+      return {
+          col: df.loc[df["keyword"] == keyword, col].values[0]
+          for col in columns
+      }
 
     formatted_evals_to_keep = [
         {
@@ -666,8 +691,7 @@ def display_page(state_manager: SessionStateManager) -> None:
             "Keyword": student_eval.keyword,
             "Criterion Type": (
                 "Negative " if df_entry.adgroup_name else "Campaign Negative "
-            )
-            + (
+            ) + (
                 "Broad"
                 if df_entry.match_type == "BROAD"
                 else "Phrase"
@@ -725,7 +749,9 @@ def display_page(state_manager: SessionStateManager) -> None:
   #
 
   st.header("Download negative keywords to remove")
-  st.markdown("Identified by the AI Student **and confirmed by a human expert**!")
+  st.markdown(
+      "Identified by the AI Student **and confirmed by a human expert**!"
+  )
 
   stop_training = st.button("Stop the training", key="stop_training")
   if stop_training:

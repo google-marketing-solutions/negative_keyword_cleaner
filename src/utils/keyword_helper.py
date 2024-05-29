@@ -18,8 +18,8 @@ from typing import Sequence, Union
 
 from gaarf.api_clients import GoogleAdsApiClient
 from gaarf.query_editor import QuerySpecification
-from gaarf.query_executor import AdsReportFetcher, GaarfReport
-from gaarf.report import GaarfRow
+from gaarf.query_executor import AdsReportFetcher
+from gaarf.report import GaarfRow, GaarfReport
 from google.api_core import exceptions
 
 from utils import auth
@@ -68,7 +68,9 @@ def get_customer_ids(
           customer.status = 'ENABLED'
     """
 
-  customer_id = [customer_id] if isinstance(customer_id, str) else list(customer_id)
+  customer_id = (
+      [customer_id] if isinstance(customer_id, str) else list(customer_id)
+  )
   customer_ids = fetch_customer_ids(standard_query)
 
   # Apply custom query if provided.
@@ -136,14 +138,16 @@ class KeywordHelper:
             "developer_token": config.developer_token,
             "login_customer_id": config.login_customer_id,
             "use_proto_plus": config.use_proto_plus,
-            "client_id": auth.OAUTH_CLIENT_ID,
-            "client_secret": auth.OAUTH_CLIENT_SECRET,
+            "client_id": auth._OAUTH_CLIENT_ID,
+            "client_secret": auth._OAUTH_CLIENT_SECRET,
             "refresh_token": auth.get_access_token(),
         },
         version=_GOOGLE_ADS_API_VERSION,
     )
     try:
-      customer_ids = get_customer_ids(googleads_api_client, config.login_customer_id)
+      customer_ids = get_customer_ids(
+          googleads_api_client, config.login_customer_id
+      )
       self.report_fetcher = AdsReportFetcher(googleads_api_client, customer_ids)
     except exceptions.InternalServerError as e:
       return None
@@ -160,7 +164,9 @@ class KeywordHelper:
       if match:
         customer_ids.append(match.group(1))
 
-    adgroup_neg_kws = self.report_fetcher.fetch(AdgroupNegativeKeywords(), customer_ids)
+    adgroup_neg_kws = self.report_fetcher.fetch(
+        AdgroupNegativeKeywords(), customer_ids
+    )
     campaign_neg_kws = self.report_fetcher.fetch(
         CampaignNegativeKeywords(), customer_ids
     )

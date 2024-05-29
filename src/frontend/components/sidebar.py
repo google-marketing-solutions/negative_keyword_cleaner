@@ -7,9 +7,7 @@ from .faq import display_faq_component
 
 def display_sidebar_component():
   with st.sidebar:
-    st.markdown(
-        textwrap.dedent(
-            """\
+    st.markdown(textwrap.dedent("""
             # About
             Our AI Student aims at helping you maintain healthy negative keywords.
 
@@ -18,8 +16,6 @@ def display_sidebar_component():
             _Made by Google Ads Professional Services_
 
             ---
-            """
-        )
-    )
+            """))
 
     display_faq_component()

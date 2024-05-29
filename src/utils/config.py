@@ -20,9 +20,11 @@ import yaml
 from google.cloud import storage
 from google.cloud.exceptions import NotFound
 
-from utils.auth import OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET
+from utils.auth import _OAUTH_CLIENT_ID, _OAUTH_CLIENT_SECRET
 
-LOCAL_CONFIG_FILE = (pathlib.Path(__file__).parents[2] / "app_config.yaml").absolute()
+LOCAL_CONFIG_FILE = (
+    pathlib.Path(__file__).parents[2] / "app_config.yaml"
+).absolute()
 GCS_CONFIG_FILE = "neg_cleaner/app_config.yaml"
 
 # GCS client
@@ -43,8 +45,8 @@ storage_client = storage.Client() if is_cloudrun() else None
 @dataclass
 class Config:
   # OAuth credentials
-  client_id: str = OAUTH_CLIENT_ID
-  client_secret: str = OAUTH_CLIENT_SECRET
+  client_id: str = _OAUTH_CLIENT_ID
+  client_secret: str = _OAUTH_CLIENT_SECRET
 
   # Google Ads API
   developer_token: str = ""
@@ -87,7 +89,8 @@ class Config:
         blob.download_to_file(file_obj)
     except NotFound:
       print(
-          f"The file {GCS_CONFIG_FILE} does not exist in bucket {DEFAULT_BUCKET_NAME}."
+          f"The file {GCS_CONFIG_FILE} does not exist in bucket"
+          f" {DEFAULT_BUCKET_NAME}."
       )
       return cls()
     return cls.from_disk(config_path="/tmp/app_config.yaml")
