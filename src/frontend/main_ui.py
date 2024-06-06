@@ -152,17 +152,10 @@ def display_page(state_manager: SessionStateManager) -> None:
           height=50,
       )
 
-  def _handle_continue_with_context():
-    """
-    Sets the session state for context continuation.
-    """
-    state_manager.set("context_ready", True)
-    state_manager.set("context_open", False)
-    state_manager.set("epoch_eval_pairs", [])
-
   if not state_manager.get("context_ready"):
     st.button(
-        "Continue with this context", on_click=_handle_continue_with_context
+        "Continue with this context",
+        on_click=event_helper.handle_continue_with_context,
     )
     st.stop()
   elif state_manager.get("context_open"):
@@ -172,37 +165,6 @@ def display_page(state_manager: SessionStateManager) -> None:
   ##
   # 2. Loads keywords
   #
-
-  def _reset_batch_props() -> None:
-    """
-    Reset the properties related to batch scoring in the session state.
-    """
-    state_manager.set("batch_scored_keywords", set())
-    state_manager.set("keyword_feedback_eval", None)
-
-  def _handle_selected_customers() -> None:
-    """
-    Handle the event when customers are selected by resetting batch properties
-    and clearing scored keywords.
-    """
-    _reset_batch_props()
-    state_manager.set("scored_keywords", None)
-
-  def _handle_selected_campaigns() -> None:
-    """
-    Handle the event when campaigns are selected by resetting batch properties
-    and clearing scored keywords.
-    """
-    _reset_batch_props()
-    state_manager.set("scored_keywords", None)
-
-  def _handle_continue_with_customers() -> None:
-    """
-    Handle the continuation with the selected customers by setting the customers
-    as ready and closing the customer loader.
-    """
-    state_manager.set("customers_ready", True)
-    state_manager.set("load_customers_open", False)
 
   def _format_customer_id(cid: int) -> str:
     """
@@ -228,14 +190,14 @@ def display_page(state_manager: SessionStateManager) -> None:
         + " | "
         + df["customer_name"].astype(str),
         [],
-        on_change=_handle_selected_customers,
+        on_change=event_helper.handle_selected_customers,
         key="selected_customers",
     )
 
     if not state_manager.get("customers_ready", False):
       st.button(
           "Continue with these customers",
-          on_click=_handle_continue_with_customers,
+          on_click=event_helper.handle_continue_with_customers,
       )
       st.stop()
 
@@ -275,7 +237,7 @@ def display_page(state_manager: SessionStateManager) -> None:
         .reset_index(name="count")
         .sort_values(["count"], ascending=True),
         [],
-        on_change=_handle_selected_campaigns,
+        on_change=event_helper.handle_selected_campaigns,
         key="selected_campaigns",
     )
 
@@ -298,42 +260,12 @@ def display_page(state_manager: SessionStateManager) -> None:
         "{:.0f}".format(df_filtered.campaign_id.nunique()).replace(",", " "),
     )
 
-  def _handle_continue_with_filters() -> None:
-    """
-    Set the session state to indicate that filters are ready.
-    """
-    state_manager.set("filters_ready", True)
-
   if not state_manager.get("filters_ready", False):
     st.button(
-        "Continue with these filters", on_click=_handle_continue_with_filters
+        "Continue with these filters",
+        on_click=event_helper.handle_continue_with_filters,
     )
     st.stop()
-
-  def _score_batch_evals() -> None:
-    """
-    Score the batch evaluations. Adds the current batch evaluation pairs to the
-    epoch evaluation pairs and resets the batch evaluation pairs.
-    """
-    # Stores batch eval pairs.
-    current_batch_eval_pairs = state_manager.get("batch_eval_pairs", None)
-    if current_batch_eval_pairs:
-      epoch_eval_pairs = state_manager.get("epoch_eval_pairs")
-      epoch_eval_pairs.append(current_batch_eval_pairs)
-      state_manager.set("batch_eval_pairs", list[models.EvaluationPair]())
-
-  def _handle_sample_batch() -> None:
-    """
-    Handle the sampling of a new batch by resetting relevant variables and
-    scoring batch evaluations.
-    """
-    # Resets variables.
-    state_manager.set("sample_new_batch", True)
-    state_manager.set("load_keywords_open", True)
-    state_manager.set("scored_keywords", None)
-    state_manager.set("random_state", models.get_random_state(force_new=True))
-    _reset_batch_props()
-    _score_batch_evals()
 
   if state_manager.get("load_keywords_open"):
     state_manager.set("load_keywords_open", False)
@@ -516,7 +448,7 @@ def display_page(state_manager: SessionStateManager) -> None:
                     state_manager=state_manager,
                 )
     else:
-      _score_batch_evals()
+      event_helper.score_batch_evals()
 
       # Computes each batch evaluation accuracy.
       epoch_eval_pairs = state_manager.get("epoch_eval_pairs", [])
@@ -556,7 +488,7 @@ def display_page(state_manager: SessionStateManager) -> None:
             align="center",
             sx={"mt": 2},
         )
-      st.button("Sample a new batch", on_click=_handle_sample_batch)
+      st.button("Sample a new batch", on_click=event_helper.handle_sample_batch)
 
   ##
   # 4. Run the student on the remaining keywords
