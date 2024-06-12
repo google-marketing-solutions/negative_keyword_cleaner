@@ -38,12 +38,16 @@ certifi==2024.6.2
     #   httpcore
     #   httpx
     #   requests
+cffi==1.16.0
+    # via cryptography
 charset-normalizer==3.3.2
     # via requests
 click==8.1.7
     # via streamlit
 contourpy==1.2.1
     # via matplotlib
+cryptography==42.0.8
+    # via -r requirements.in
 cycler==0.12.1
     # via matplotlib
 distro==1.9.0
@@ -293,6 +297,8 @@ pyasn1==0.6.0
     #   rsa
 pyasn1-modules==0.4.0
     # via google-auth
+pycparser==2.22
+    # via cffi
 pydantic==2.7.3
     # via
     #   google-cloud-aiplatform

@@ -1,10 +1,28 @@
-# AI Student for Negative Keywords
+# Negative Keyword Cleaner
 
-## Deploy
+Negative Keyword Cleaner is a solution that leverages Large Language Models to
+identify and help you remove Negative Keywords blocking traffic from your
+Google Ads account.
 
-If not already done, create a [Consent Screen](https://console.cloud.google.com/apis/credentials/consent) on the GCP Console and publish it.
+## Deployment
 
-Then create a new [OAuth 2.0 Client ID](https://pantheon.corp.google.com/apis/credentials) with "Web Application" as type (leave the rest blank). Take note of the Client ID and Client Secret, you are going to need them in the next step.
+To avoid potential conflicts, we recommend deploying this solution in a new
+Google Cloud Platform (GCP) project. Existing GCP projects may already be
+linked to a specific Google Ads Manager Account (MCC) through prior use of the
+Google Ads API.
+
+If you're certain that your chosen GCP project has not been used with the
+Google Ads API, or that it has only been used with the same MCC you intend to
+use now, you may proceed with the steps below.
+
+If not already done, create
+a [Consent Screen](https://console.cloud.google.com/apis/credentials/consent)
+on the GCP Console and publish it.
+
+Then create a
+new [OAuth 2.0 Client ID](https://pantheon.corp.google.com/apis/credentials)
+with "Web Application" as type (leave the rest blank). Take note of the Client
+ID and Client Secret, you are going to need them in the next step.
 
 Open up Cloud Shell:
 
@@ -16,13 +34,16 @@ Open up Cloud Shell:
 
     export TF_VAR_project_id=$(gcloud config list --format 'value(core.project)')
 
-You can edit the ```terraform/main.tf``` file under the google_iam_policy.noauth section, to restrict access to specific users (the app will be visible to all users with the url per default).
+You can edit the ```terraform/main.tf``` file under the
+google_iam_policy.noauth section, to restrict access to specific users (the app
+will be visible to all users with the url per default).
 
     # Build and deploy container
     docker build -t gcr.io/$TF_VAR_project_id/negatives:v1 . --no-cache
     docker push gcr.io/$TF_VAR_project_id/negatives:v1
 
-If it doesn't deploy, you might have to run `gcloud auth configure-docker` and try again.
+If it doesn't deploy, you might have to run `gcloud auth configure-docker` and
+try again.
 
     # Deploys the solution.
     cd terraform/
@@ -33,7 +54,6 @@ If it doesn't deploy, you might have to run `gcloud auth configure-docker` and t
 
 Go back to Credentials > OAuth 2.0 Client ID and select your Client ID.
 Add the App URL into the list of Authorized Redirect URL.
-
 
 ## Uninstall
 

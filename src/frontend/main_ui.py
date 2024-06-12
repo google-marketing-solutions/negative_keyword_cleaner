@@ -46,7 +46,6 @@ def _set_manual_context(
 ) -> Callable[[], None]:
   def _set_manual_context_callback():
     state_manager.set("manual_context", True)
-    # st.session_state.company_homepage_url = "Manual mode, please enter you context below"
     pass
 
   return _set_manual_context_callback
