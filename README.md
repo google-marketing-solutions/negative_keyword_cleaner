@@ -20,7 +20,7 @@ a [Consent Screen](https://console.cloud.google.com/apis/credentials/consent)
 on the GCP Console and publish it.
 
 Then create a
-new [OAuth 2.0 Client ID](https://pantheon.corp.google.com/apis/credentials)
+new [OAuth 2.0 Client ID](https://console.cloud.google.com/apis/credentials)
 with "Web Application" as type (leave the rest blank). Take note of the Client
 ID and Client Secret, you are going to need them in the next step.
 
