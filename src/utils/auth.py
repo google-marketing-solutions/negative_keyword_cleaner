@@ -30,8 +30,7 @@ except Exception as err:
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 import streamlit as st
-from st_oauth import st_oauth
-from st_oauth.st_oauth import _STKEY as ST_OAUTH_TOKEN_KEY
+import utils.st_oauth as oauth
 
 # Google OAuth2.0 configuration
 _AUTHORIZE_URL = os.getenv(
@@ -82,11 +81,11 @@ def authenticate_user():
       "audience": _OAUTH_CLIENT_ID,
       "identity_field_in_token": "sub",
   }
-  st_oauth(oauth2_params, label=_GOOGLE_SIGN_IN_CODE)
+  oauth.st_oauth(oauth2_params, label=_GOOGLE_SIGN_IN_CODE)
 
 
 def get_access_token():
-  oauth_result = st.session_state[ST_OAUTH_TOKEN_KEY]
+  oauth_result = st.session_state[oauth._STKEY]
   return oauth_result["access_token"]
 
 

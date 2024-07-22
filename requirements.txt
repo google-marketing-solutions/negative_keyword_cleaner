@@ -314,9 +314,7 @@ pydeck==0.9.1
 pygments==2.18.0
     # via rich
 pyjwt==2.8.0
-    # via
-    #   -r requirements.in
-    #   st-oauth
+    # via -r requirements.in
 pyparsing==3.1.2
     # via
     #   httplib2
@@ -355,7 +353,6 @@ requests==2.32.3
     #   langchain
     #   langsmith
     #   requests-oauthlib
-    #   st-oauth
     #   streamlit
     #   tiktoken
     #   transformers
@@ -390,12 +387,9 @@ soupsieve==2.5
     # via beautifulsoup4
 sqlalchemy==2.0.30
     # via langchain
-st-oauth @ git+https://github.com/FrancoisPerez/st_oauth.git@v1.1
-    # via -r requirements.in
 streamlit==1.30.0
     # via
     #   -r requirements.in
-    #   st-oauth
     #   streamlit-elements
 streamlit-elements==0.1.0
     # via -r requirements.in

@@ -15,7 +15,6 @@ tiktoken
 transformers
 streamlit-elements
 PyJWT
-git+https://github.com/FrancoisPerez/st_oauth.git@v1.1#egg=st_oauth
 matplotlib
 google-auth-oauthlib
 google-auth-httplib2

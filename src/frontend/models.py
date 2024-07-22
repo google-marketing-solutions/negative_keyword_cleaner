@@ -145,7 +145,7 @@ def fetch_landing_page_text(url: str) -> List[Document]:
 
     component_value = components.html(js_code, height=0, width=0)
 
-    if component_value.startswith("Error:"):
+    if component_value.text.startswith("Error:"):
       st.error(component_value)
       st.stop()
 
@@ -245,7 +245,7 @@ class KeywordEvaluation:
   @classmethod
   def from_dict(cls, data: dict[str, str]):
     return cls(
-        keyword=data.get("keyword", data.get("Keyword")),
+        keyword=data.get("keyword", data.get("Keyword", "")),
         decision=ScoreDecision(
             data.get("decision", ScoreDecision.UNKNOWN.value)
         ),
@@ -316,19 +316,9 @@ def format_scoring_fragment(
   return "\n".join(modified_lines)
 
 
-def parse_scoring_response(response: str) -> List[KeywordEvaluation]:
-  """
-  Parses the LLM response expected in YAML format into a list of KeywordEvaluation objects.
-
-  Parameters:
-  response (str): The LLM response in YAML format.
-
-  Returns:
-  List[KeywordEvaluation]: A list of KeywordEvaluation objects parsed from the response.
-  """
-
-  # PaLM 2 cleaning
-  response = (
+def _clean_yaml_response(response: str) -> str:
+  """Cleans the LLM response for YAML parsing."""
+  return (
       response.replace("```yaml", "")
       .replace("```YAML", "")
       .replace("```", "")
@@ -336,14 +326,45 @@ def parse_scoring_response(response: str) -> List[KeywordEvaluation]:
       .strip()
   )
 
-  if not response:
-    response = "[]"
 
-  data = yaml.safe_load(response)
+def parse_scoring_response(response: str) -> List[KeywordEvaluation]:
+  """Parses the LLM response in YAML format into KeywordEvaluation objects.
+
+  Args:
+      response (str): The LLM response.
+
+  Returns:
+      List[KeywordEvaluation]: A list of parsed keyword evaluations.
+  """
+
+  response = _clean_yaml_response(response)
+
+  if not response:
+    return []
+
+  try:
+    data = yaml.safe_load(response)
+  except yaml.parser.ParserError as e:
+    logger.error(f"Error parsing YAML data: {e}")
+    logger.error(f"Original Content: {data}")
+    return []
+
   outputs = []
-  for d in data:
+  for item_yaml in response.split("\n-"):
+    item_yaml = item_yaml.strip()
+    if not item_yaml:
+      continue
+
     try:
-      outputs.append(KeywordEvaluation.from_dict(d))
-    except (TypeError, ValueError) as inst:
-      logger.error(f"Failed to parse keyword: {inst}")
+      item_yaml = (
+          "- " + item_yaml if not item_yaml.startswith("-") else item_yaml
+      )
+      item = yaml.safe_load(item_yaml)
+      if isinstance(item[0], dict):
+        outputs.append(KeywordEvaluation.from_dict(item[0]))
+    except (yaml.parser.ParserError, TypeError, ValueError) as e:
+      logger.error(
+          f"Failed to parse keyword: {e}. Original Content: {item_yaml}"
+      )
+
   return outputs

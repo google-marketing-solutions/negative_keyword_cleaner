@@ -293,10 +293,13 @@ def display_page(state_manager: SessionStateManager) -> None:
     formatted_facts = models.format_scoring_fragment(
         state_manager.get("evaluations") or _SCHEMA_EVALUATIONS
     )
-    # formatted_keywords = yaml.dump(df_keywords['keyword'].tolist(),
-    #                           allow_unicode=True)
+
     formatted_keywords = json.dumps(
-        df_keywords["keyword"].values.tolist(), ensure_ascii=False
+        [
+            keyword.strip("'\"")
+            for keyword in df_keywords["keyword"].values.tolist()
+        ],
+        ensure_ascii=False,
     )
 
     template = textwrap.dedent("""\
@@ -315,7 +318,7 @@ def display_page(state_manager: SessionStateManager) -> None:
             3. Brand Protection: Does the keyword prevent ads from appearing in damaging contexts?
             4. Campaign Objectives: Does the keyword align with the overall campaign goals?
 
-            Do not use quotes in the 'reason' field. 
+            Do not use any quotes (' or ") in the 'reason' field nor mention the initial keyword.
             Your output should strictly follow the specified YAML format, with no additional text.
 
             KEEP means: Keep this keyword in the Negative Keyword list to prevent ads from showing for that search term.
@@ -396,6 +399,7 @@ def display_page(state_manager: SessionStateManager) -> None:
     keywords_to_remove = []
     keywords_to_keep = []
     keywords_unknown = []
+
     for item in parsed_scored_keywords:
       if item.keyword in state_manager.get("scored_set"):
         continue

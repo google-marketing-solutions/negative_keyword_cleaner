@@ -44,7 +44,7 @@ resource "google_storage_bucket" "main" {
   storage_class               = "STANDARD"
   force_destroy               = true
   uniform_bucket_level_access = true
-  depends_on                  = [null_resource.enable_cloud_apis]
+  depends_on = [null_resource.enable_cloud_apis]
 }
 resource "google_storage_bucket_iam_member" "member" {
   bucket = google_storage_bucket.main.name
@@ -59,13 +59,13 @@ resource "google_storage_bucket_iam_member" "member" {
 resource "google_project_service" "aiplatform" {
   service            = "aiplatform.googleapis.com"
   disable_on_destroy = false
-  depends_on         = [null_resource.enable_cloud_apis]
+  depends_on = [null_resource.enable_cloud_apis]
 }
 
 resource "google_project_service" "apikeys" {
   service            = "apikeys.googleapis.com"
   disable_on_destroy = false
-  depends_on         = [null_resource.enable_cloud_apis]
+  depends_on = [null_resource.enable_cloud_apis]
 }
 
 resource "random_id" "vertexai_apikey_suffix" {
@@ -79,7 +79,7 @@ resource "google_apikeys_key" "vertexai" {
 
   restrictions {
     api_targets {
-      service = "language.googleapis.com"
+      service = "generativelanguage.googleapis.com"
     }
   }
 
@@ -93,7 +93,7 @@ resource "google_apikeys_key" "vertexai" {
 resource "google_project_service" "googleads" {
   service            = "googleads.googleapis.com"
   disable_on_destroy = false
-  depends_on         = [null_resource.enable_cloud_apis]
+  depends_on = [null_resource.enable_cloud_apis]
 }
 
 ##
@@ -103,7 +103,7 @@ resource "google_project_service" "googleads" {
 resource "google_project_service" "cloud_run" {
   service            = "run.googleapis.com"
   disable_on_destroy = false
-  depends_on         = [null_resource.enable_cloud_apis]
+  depends_on = [null_resource.enable_cloud_apis]
 }
 
 resource "google_cloud_run_v2_service" "default" {
@@ -160,7 +160,7 @@ resource "google_cloud_run_v2_service" "default" {
 
 data "google_iam_policy" "noauth" {
   binding {
-    role    = "roles/run.invoker"
+    role = "roles/run.invoker"
     members = [
       "allUsers",
     ]

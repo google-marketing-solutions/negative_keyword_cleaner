@@ -1,5 +1,7 @@
 # Negative Keyword Cleaner
 
+### This is NOT an official Google product
+
 Negative Keyword Cleaner is a solution that leverages Large Language Models to
 identify and help you remove Negative Keywords blocking traffic from your
 Google Ads account.

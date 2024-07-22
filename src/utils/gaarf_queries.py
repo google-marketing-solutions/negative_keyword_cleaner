@@ -137,24 +137,3 @@ class AccountNegativeKeywords(BaseQuery):
             WHERE
                 shared_set.type = NEGATIVE_KEYWORDS
         """
-
-
-class CampaignsForSharedSets(BaseQuery):
-  """
-  Class for querying campaigns that are associated with specific shared sets.
-
-  This class extends BaseQuery to execute a SQL query that selects details of campaigns
-  linked to given shared sets, which are identified by their resource names.
-  """
-
-  def __init__(self, campaign_resource_names) -> None:
-    self.query_text = f"""
-            SELECT
-              campaign.id,
-              campaign.name,
-              campaign_shared_set.shared_set
-            FROM
-              campaign_shared_set
-            WHERE
-              campaign_shared_set.shared_set IN ({','.join([f"'{name}'" for name in campaign_resource_names])})
-        """
