@@ -23,7 +23,6 @@ dependencies = [
     "matplotlib",
     "google-auth-oauthlib",
     "google-auth-httplib2",
-    "alive-progress",
 ]
 requires-python = ">=3.11"
 

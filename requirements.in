@@ -1,6 +1,5 @@
 streamlit==1.30.0
 google-api-python-client
-google-ads
 google-ads-api-report-fetcher
 tenacity
 langchain
@@ -19,5 +18,4 @@ matplotlib
 google-auth-oauthlib
 google-auth-httplib2
 google-cloud-aiplatform
-alive-progress
 cryptography
