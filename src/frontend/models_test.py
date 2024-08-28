@@ -67,7 +67,8 @@ class ModelsTest(unittest.TestCase):
         ),
     ]
     self.assertEqual(
-        models.parse_scoring_response(EXPECTED_RESPONSE), expected_evaluations
+        models.parse_scoring_response(EXPECTED_RESPONSE),
+        expected_evaluations,
     )
 
 

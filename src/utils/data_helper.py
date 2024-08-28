@@ -104,7 +104,8 @@ def load_customers() -> pd.DataFrame:
     all_customers = []
     for customer in customers_report:
       customer_obj = Customer(
-          customer.customer_client_id, customer.customer_client_descriptive_name
+          customer.customer_client_id,
+          customer.customer_client_descriptive_name,
       )
       all_customers.append(customer_obj)
 

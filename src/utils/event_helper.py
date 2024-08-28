@@ -22,12 +22,23 @@ from utils import config
 from utils.config import Config
 
 
-class SessionStateManager:
+class session_state_manager:
+  """Manages the application's session state using Streamlit's session state.
+
+     This class provides a singleton implementation to manage state variables
+     for a Streamlit application. It ensures that only one instance of the
+     session state manager is created and provides methods to initialize,
+     get, set, update, and list session state variables.
+
+     The session state manager allows the application to maintain a
+     consistent state across different user interactions, such as tracking
+     configurations, user selections, and evaluations.
+  """
   _instance = None
 
   def __new__(cls, *args, **kwargs):
     if cls._instance is None:
-      cls._instance = super(SessionStateManager, cls).__new__(cls)
+      cls._instance = super(session_state_manager, cls).__new__(cls)
     return cls._instance
 
   def __init__(self):
@@ -82,7 +93,7 @@ class SessionStateManager:
     return list(st.session_state.keys())
 
 
-state_manager = SessionStateManager()
+state_manager = session_state_manager()
 
 
 def handle_continue_with_context():
@@ -99,6 +110,7 @@ def reset_batch_props() -> None:
   Reset the properties related to batch scoring in the session state.
   """
   state_manager.set("batch_scored_keywords", set())
+  state_manager.set("scored_set", set())
   state_manager.set("keyword_feedback_eval", None)
 
 
@@ -142,11 +154,16 @@ def score_batch_evals() -> None:
   epoch evaluation pairs and reset the batch evaluation pairs.
   """
   # Stores batch eval pairs.
-  current_batch_eval_pairs = state_manager.get("batch_eval_pairs", None)
-  if current_batch_eval_pairs:
+  current_batch_eval_pairs = state_manager.get("eval_pairs", [])
+  if current_batch_eval_pairs is not None:
     epoch_eval_pairs = state_manager.get("epoch_eval_pairs")
-    epoch_eval_pairs.append(current_batch_eval_pairs)
+    current_batch_evals = state_manager.get("eval_pairs", [])
+    epoch_eval_pairs.append(current_batch_evals)
     state_manager.set("batch_eval_pairs", list[models.EvaluationPair]())
+    state_manager.set("epoch_eval_pairs", epoch_eval_pairs)
+
+    # Set the batch_completed flag to True
+    state_manager.set("batch_completed", True)
 
 
 def handle_sample_batch() -> None:
@@ -158,6 +175,7 @@ def handle_sample_batch() -> None:
   state_manager.set("sample_new_batch", True)
   state_manager.set("load_keywords_open", True)
   state_manager.set("scored_keywords", None)
+  state_manager.set("batch_eval_pairs", list())
   state_manager.set("random_state", models.get_random_state(force_new=True))
   reset_batch_props()
   score_batch_evals()
@@ -192,15 +210,15 @@ def _save_human_eval(
   human_eval (models.KeywordEvaluation): The human evaluation.
   llm_eval (models.KeywordEvaluation): The LLM evaluation.
   """
-  evaluation = state_manager.get("evaluations")
+  evaluation = state_manager.get("evaluations", {})
   evaluation[human_eval.keyword] = human_eval
-  state_manager.set("evaluation", evaluation)
+  state_manager.set("evaluations", evaluation)
 
   scored_set = state_manager.get("scored_set")
   scored_set.add(human_eval.keyword)
   state_manager.set("scored_set", scored_set)
 
-  eval_pairs = state_manager.get("eval_pairs")
+  eval_pairs = state_manager.get("eval_pairs", [])
   eval_pairs.append(
       models.EvaluationPair(
           llm_decision=llm_eval.decision, human_decision=human_eval.decision

@@ -22,7 +22,6 @@ from utils import event_helper
 
 def render_item_card(
     item: models.KeywordEvaluation,
-    state_manager: event_helper.SessionStateManager,
     keyword_feedback_eval: KeywordEvaluation = None,
     df_keywords: pd.DataFrame = None,
 ) -> None:
@@ -38,7 +37,11 @@ def render_item_card(
   kw_lines = df_keywords.loc[df_keywords.keyword == item.keyword]
   kw_campaigns = kw_lines.campaign_name.tolist()
 
-  card_style = {"display": "flex", "flexDirection": "column", "borderRadius": 3}
+  card_style = {
+      "display": "flex",
+      "flexDirection": "column",
+      "borderRadius": 3,
+  }
   card_header_style = {"background": "rgba(250, 250, 250, 0.1)"}
   with mui.Card(key="first_item", sx=card_style, elevation=1):
     mui.CardHeader(

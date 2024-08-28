@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+"""This module manages the config and validation of the app's setup.
+"""
 
 import logging
 
@@ -22,7 +23,7 @@ from utils import event_helper
 from utils.config import is_cloudrun
 
 logger = logging.getLogger("streamlit")
-state_manager = event_helper.SessionStateManager()
+state_manager = event_helper.session_state_manager()
 
 _CONFIG_CREDENTIALS = 1
 _CONFIG_ADS = 2
@@ -33,14 +34,15 @@ DEV_TOKEN_HELP = """Refer to
     [How to obtain a developer token](https://developers.google.com/google-ads/api/docs/first-call/dev-token#:~:text=A%20developer%20token%20from%20Google,SETTINGS%20%3E%20SETUP%20%3E%20API%20Center.)
     for more information"""
 
-GOOGLE_ADS_HELP = """Google Ads MCC account ID. You can set 
+GOOGLE_ADS_HELP = """Google Ads MCC account ID. You can set
     it both with or without hyphens (ie. XXX-XXX-XXXX)"""
 
 
 def validate_setup() -> None:
-  """
-  Validates the application setup by checking various configuration parameters.
-  Updates the session state to reflect the validity of different configuration sections.
+  """Validates the application setup by checking various configuration params.
+
+  Updates the session state to reflect the validity of different
+  configuration sections.
   """
   config = state_manager.get("config")
   state_manager.set("valid_ads_config", False)
@@ -76,11 +78,10 @@ def validate_setup() -> None:
 
 
 def _save_config(config) -> None:
-  """
-  Saves the provided configuration to the appropriate storage based on the environment.
+  """Saves the provided config to the appropriate storage based on the env.
 
-  Parameters:
-  config: The configuration object to be saved.
+  Args:
+    config: The configuration object to be saved.
   """
   if is_cloudrun():
     config.save_to_gcs()
@@ -89,22 +90,20 @@ def _save_config(config) -> None:
 
 
 def update_config(updating_config: str) -> None:
-  """
-  Updates the configuration section currently being modified.
+  """Updates the configuration section currently being modified.
 
-  Parameters:
-  updating_config (str): The configuration section being updated.
+  Args:
+    updating_config (str): The configuration section being updated.
   """
   state_manager.set("updating_config", updating_config)
   state_manager.set("valid_config", False)
 
 
 def save_api_config(config) -> None:
-  """
-  Saves the API configuration for large language models and validates the setup.
+  """Saves the API configuration for LLM and validates the setup.
 
-  Parameters:
-  config: The configuration object containing API settings.
+  Args:
+    config: The configuration object containing API settings.
   """
   _save_config(config)
   st.session_state.valid_api_config = True
@@ -113,11 +112,10 @@ def save_api_config(config) -> None:
 
 
 def save_general_config(config) -> None:
-  """
-  Saves the general application settings and validates the setup.
+  """Saves the general application settings and validates the setup.
 
-  Parameters:
-  config: The configuration object containing general settings.
+  Args:
+    config: The configuration object containing general settings.
   """
   config.batch_size = st.session_state.batch_size
   _save_config(config)
@@ -127,9 +125,8 @@ def save_general_config(config) -> None:
   validate_setup()
 
 
-def display_page(state_manager: event_helper.SessionStateManager) -> None:
-  """
-  Display the application settings page.
+def display_page() -> None:
+  """Display the application settings page.
   """
   st.header("App Settings")
 
@@ -139,10 +136,7 @@ def display_page(state_manager: event_helper.SessionStateManager) -> None:
     st.success("Application successfully setup ✅")
 
   config = state_manager.get("config")
-  modify_api_config = any([
-      not st.session_state.valid_api_config,
-      st.session_state.updating_config == _CONFIG_AI_API,
-  ])
+
   modify_general_config = any([
       not st.session_state.valid_general_config,
       st.session_state.updating_config == _CONFIG_GENERAL,
@@ -154,7 +148,7 @@ def display_page(state_manager: event_helper.SessionStateManager) -> None:
           not st.session_state.updating_config,
           not st.session_state.valid_general_config,
       ]):
-        st.error(f"Incorrect tool configuration", icon="⚠️")
+        st.error("Incorrect tool configuration", icon="⚠️")
 
       st.number_input(
           "Batch size",
@@ -169,7 +163,9 @@ def display_page(state_manager: event_helper.SessionStateManager) -> None:
 
       if modify_general_config:
         st.form_submit_button(
-            "Save", on_click=save_general_config, args=[st.session_state.config]
+            "Save",
+            on_click=save_general_config,
+            args=[st.session_state.config],
         )
       else:
         st.form_submit_button(

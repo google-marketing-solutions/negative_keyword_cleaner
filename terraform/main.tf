@@ -62,6 +62,12 @@ resource "google_project_service" "aiplatform" {
   depends_on = [null_resource.enable_cloud_apis]
 }
 
+resource "google_project_service" "generativeai" {
+  service            = "generativelanguage.googleapis.com"
+  disable_on_destroy = false
+  depends_on = [null_resource.enable_cloud_apis]
+}
+
 resource "google_project_service" "apikeys" {
   service            = "apikeys.googleapis.com"
   disable_on_destroy = false
@@ -74,7 +80,7 @@ resource "random_id" "vertexai_apikey_suffix" {
 
 resource "google_apikeys_key" "vertexai" {
   name         = "negcleaner-palm2-${random_id.vertexai_apikey_suffix.hex}"
-  display_name = "Negative Keywords Cleaner - PALM 2"
+  display_name = "Negative Keywords Cleaner - Generative AI"
   project      = var.project_id
 
   restrictions {

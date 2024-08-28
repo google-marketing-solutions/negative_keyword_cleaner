@@ -26,7 +26,7 @@ from utils import auth
 from utils.config import Config
 from utils.gaarf_queries import CustomerNames, AdgroupNegativeKeywords, CampaignNegativeKeywords, KeywordLevel
 
-_GOOGLE_ADS_API_VERSION = "v15"
+_GOOGLE_ADS_API_VERSION = "v16"
 
 
 class MatchType(Enum):

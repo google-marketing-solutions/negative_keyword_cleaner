@@ -11,15 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""This module provides UI customization for Streamlit UI.
+
+It allows for customizing the appearance of buttons in the application.
+"""
 
 import streamlit as st
 
 
 def customize_css():
+  """Applies custom CSS to center-align download button."""
   st.markdown(
-      """
-              <style >
-                  .stDownloadButton, div.stButton {text-align:center}
-              </style>""",
+      """<style>.stDownloadButton, div.stButton {text-align:center}</style>""",
       unsafe_allow_html=True,
   )

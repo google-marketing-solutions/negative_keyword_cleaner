@@ -93,8 +93,9 @@ def fetch_landing_page_text(url: str) -> List[Document]:
     # To avoid this, we are mimicking an actual browser
     headers = {
         "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
-            " (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
+            " AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0"
+            " Safari/537.36"
         ),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
         "Accept-Language": "en-US,en;q=0.9",
@@ -156,35 +157,34 @@ def fetch_landing_page_text(url: str) -> List[Document]:
   return text_splitter.create_documents([content])
 
 
-def summarize_text(_docs: Document, _llm: LLM, verbose: bool = False) -> str:
-  """
-  Summarizes the given text using LangChain's summary chain.
+def summarize_text(docs: list[Document], llm: LLM, verbose: bool = False) -> (
+    str):
+  """Summarizes the given text using LangChain's summary chain.
 
-  Parameters:
-  docs (Document): Documents to summarize.
-  llm (LLM): Language model to use for summarization.
-  verbose (bool): If True, enables verbose mode.
+  Args:
+    docs (Document): Documents to summarize.
+    llm (LLM): Language model to use for summarization.
+    verbose (bool): If True, enables verbose mode.
 
   Returns:
-  str: The summarized text.
+    str: The summarized text.
   """
   prompt = PromptTemplate(
       template=_SUMMARY_PROMPT_TEMPLATE, input_variables=["text"]
   )
   chain = summarize.load_summarize_chain(
-      _llm, chain_type="map_reduce", map_prompt=prompt, verbose=verbose
+      llm, chain_type="map_reduce", map_prompt=prompt, verbose=verbose
   )
-  return chain.run(_docs)
+  return chain.run(docs)
 
 
 class ScoreDecision(enum.StrEnum):
-  """
-  Enumeration for scoring decisions.
+  """Enumeration for scoring decisions.
 
   Attributes:
-  UNKNOWN (str): Represents the case where the LLM didn't know which decision to take.
-  REMOVE (str): Represents a decision to remove a keyword.
-  KEEP (str): Represents a decision to keep a keyword.
+    UNKNOWN (str): When the LLM didn't know which decision to take.
+    REMOVE (str): Decision to remove a keyword.
+    KEEP (str): Decision to keep a keyword.
   """
 
   UNKNOWN = "UNKNOWN"
@@ -193,26 +193,28 @@ class ScoreDecision(enum.StrEnum):
 
 
 def asdict_enum_factory(data: Dict[str, Any]) -> Dict[str, Any]:
-  """
-  Factory function to create a custom serialization function for dataclasses.
-  This function handles enum members by converting them to their respective values.
+  """Factory function to create a custom serialization function for dataclasses.
 
-  Parameters:
-  data (Dict[str, Any]): The data dictionary to serialize.
+  This function handles enum members by converting them to their respective
+  values.
+
+  Args:
+    data (Dict[str, Any]): The data dictionary to serialize.
 
   Returns:
-  Dict[str, Any]: A dictionary with enum members serialized to their values.
+    Dict[str, Any]: A dictionary with enum members serialized to their values.
   """
 
   def serialize_enum_value(obj: Any) -> Any:
-    """
-    Serializes an enum member to its value if the object is an enum, otherwise returns the object as is.
+    """Serializes an enum member to its value if the object is an enum.
 
-    Parameters:
-    obj (Any): The object to serialize.
+    It otherwise returns the object as is.
+
+    Args:
+     obj (Any): The object to serialize.
 
     Returns:
-    Any: The serialized object.
+     Any: The serialized object.
     """
     if isinstance(obj, enum.Enum):
       return obj.value

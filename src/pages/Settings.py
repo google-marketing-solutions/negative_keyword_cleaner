@@ -12,16 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""This script initializes the Streamlit-based user interface for the app.
+"""
 import streamlit as st
 
 import frontend.helper as st_helper
 import frontend.settings_ui as settings_ui
-from utils.event_helper import SessionStateManager
+from utils.event_helper import session_state_manager
 
 with open("src/frontend/style/style.css") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+  st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-state_manager = SessionStateManager()
+state_manager = session_state_manager()
 
 st_helper.customize_css()
 settings_ui.validate_setup()
