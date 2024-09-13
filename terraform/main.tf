@@ -140,6 +140,22 @@ resource "google_cloud_run_v2_service" "default" {
         name  = "DEFAULT_BUCKET_NAME"
         value = google_storage_bucket.main.name
       }
+
+      env {
+        name  = "MCC_ID"
+        value = var.mcc_id
+      }
+
+      env {
+        name  = "GOOGLE_ADS_API_TOKEN"
+        value = var.google_ads_api_token
+      }
+
+      env {
+        name  = "OPENAI_API_KEY"
+        value = var.openai_api_key
+      }
+      
       resources {
         limits = {
           cpu    = "2"

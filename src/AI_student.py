@@ -25,15 +25,14 @@ st.set_page_config(
 )
 
 with open("src/frontend/style/style.css") as f:
-  st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 state_manager = event_helper.SessionStateManager()
 
-st_helper.initialize_session_state(state_manager)
 st_helper.customize_css()
 settings_ui.validate_setup()
 
 if st.session_state.valid_config:
-  main_ui.display_page(state_manager)
+    main_ui.display_page(state_manager)
 else:
-  settings_ui.display_page(state_manager)
+    settings_ui.display_page(state_manager)

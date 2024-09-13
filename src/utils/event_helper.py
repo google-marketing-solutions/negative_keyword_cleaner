@@ -11,13 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import logging
 from collections import OrderedDict
 from typing import Callable, Any
 
 import streamlit as st
 
 from frontend import models
+from utils import config
+from utils.config import Config
 
 
 class SessionStateManager:
@@ -30,6 +32,22 @@ class SessionStateManager:
 
   def __init__(self):
     self.initialize("scored_set", set())
+    self.initialize("valid_config", False)
+    self.initialize("valid_api_config", False)
+    self.initialize("valid_ads_config", False)
+    self.initialize("valid_general_config", False)
+    self.initialize("updating_config", None)
+    self.initialize("loaded_kws", [])
+    if "config" not in self.list_keys():
+      if config.is_cloudrun():
+        logging.warning("IS CLOUDRUN INSTANCE")
+        self.set("config", Config.from_gcs())
+      else:
+        logging.warning("IS DISK INSTANCE")
+        self.set("config", Config.from_disk())
+    if "batch_size" not in self.list_keys():
+      batch_size = self.get("config").batch_size or 15
+      self.set("batch_size", batch_size)
 
   def initialize(self, key, default_value):
     """Initialize a session state variable if it does not exist."""

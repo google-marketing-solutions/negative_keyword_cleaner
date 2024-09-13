@@ -14,33 +14,12 @@
 
 import streamlit as st
 
-from utils import config
-from utils.config import Config
-from utils.event_helper import SessionStateManager
-
 
 def customize_css():
   st.markdown(
       """
-          <style >
-              .stDownloadButton, div.stButton {text-align:center}
-          </style>""",
+              <style >
+                  .stDownloadButton, div.stButton {text-align:center}
+              </style>""",
       unsafe_allow_html=True,
   )
-
-
-def initialize_session_state(state_manager: SessionStateManager):
-  state_manager.initialize("valid_config", False)
-  state_manager.initialize("valid__api_config", False)
-  state_manager.initialize("valid_ads_config", False)
-  state_manager.initialize("valid_general_config", False)
-  state_manager.initialize("updating_config", None)
-  state_manager.initialize("loaded_kws", [])
-  if "config" not in state_manager.list_keys():
-    if config.is_cloudrun():
-      state_manager.set("config", Config.from_gcs())
-    else:
-      state_manager.set("config", Config.from_disk())
-  if "batch_size" not in state_manager.list_keys():
-    batch_size = state_manager.get("config").batch_size
-    state_manager.set("batch_size", batch_size)
