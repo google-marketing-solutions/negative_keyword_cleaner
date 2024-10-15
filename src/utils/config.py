@@ -87,7 +87,7 @@ class Config:
     bucket = storage_client.bucket(DEFAULT_BUCKET_NAME)
     blob = bucket.blob(GCS_CONFIG_FILE)
     try:
-      with open("/tmp/app_config.yaml", "wb", encoding="utf-8") as file_obj:
+      with open("/tmp/app_config.yaml", "w", encoding="utf-8") as file_obj:
         blob.download_to_file(file_obj)
     except exceptions.NotFound:
       logging.error(

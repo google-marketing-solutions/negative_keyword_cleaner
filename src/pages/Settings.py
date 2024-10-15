@@ -27,4 +27,4 @@ state_manager = session_state_manager()
 
 st_helper.customize_css()
 settings_ui.validate_setup()
-settings_ui.display_page(state_manager)
+settings_ui.display_page()

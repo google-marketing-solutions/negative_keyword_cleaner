@@ -318,11 +318,11 @@ def _load_negative_keywords(state_manager):
     )
     col2.metric(
         "Total unique keywords",
-        f"{len(df.keyword.nunique()):.0f}".replace(",", " "),
+        f"{df.keyword.nunique():.0f}".replace(",", " "),
     )
     col3.metric(
         "Total campaigns",
-        f"{len(df.campaign_id.nunique()):.0f}".replace(",", " "),
+        f"{df.campaign_id.nunique():.0f}".replace(",", " "),
     )
 
 
@@ -355,7 +355,11 @@ def _filter_campaigns(state_manager):
 
     filtered_keywords = df.copy()
     if state_manager.get("selected_campaigns", None):
-      filtered_keywords = filtered_keywords.query("campaign_name in @options")
+      selected_campaigns = state_manager.get("selected_campaigns")
+      campaigns_filter = filtered_keywords["campaign_name"].isin(
+          selected_campaigns
+      )
+      filtered_keywords = filtered_keywords[campaigns_filter]
       state_manager.set("filtered_keywords", filtered_keywords)
 
     col1, col2, col3 = st.columns(3)
@@ -365,11 +369,11 @@ def _filter_campaigns(state_manager):
     )
     col2.metric(
         "Selected Unique keywords",
-        f"{len(filtered_keywords.keyword.nunique()):.0f}".replace(",", " "),
+        f"{filtered_keywords.keyword.nunique():.0f}".replace(",", " "),
     )
     col3.metric(
         "Selected campaigns",
-        f"{len(filtered_keywords.campaign_id.nunique()):.0f}".replace(",", " "),
+        f"{filtered_keywords.campaign_id.nunique():.0f}".replace(",", " "),
     )
 
 
@@ -676,7 +680,7 @@ def _process_remaining_keywords(state_manager):
         exclude_keywords=scoring_seen_kws,
         random_state=random_state,
     )
-    if not keywords:
+    if keywords.empty:
       scoring_bar.progress(1.0, text="")
       st.markdown("Done ✅")
       break
