@@ -24,9 +24,12 @@ from google.api_core import exceptions
 
 from utils import auth
 from utils.config import Config
-from utils.gaarf_queries import CustomerNames, AdgroupNegativeKeywords, CampaignNegativeKeywords, KeywordLevel
+from utils.gaarf_queries import AdgroupNegativeKeywords
+from utils.gaarf_queries import CampaignNegativeKeywords
+from utils.gaarf_queries import CustomerNames
+from utils.gaarf_queries import KeywordLevel
 
-_GOOGLE_ADS_API_VERSION = "v16"
+_GOOGLE_ADS_API_VERSION = "v18"
 
 
 class MatchType(Enum):
