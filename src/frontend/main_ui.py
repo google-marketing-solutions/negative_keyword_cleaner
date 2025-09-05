@@ -268,7 +268,7 @@ def _load_customers(state_manager):
       "2. Load Customers",
       expanded=state_manager.get("load_customers_open", True),
   ):
-    df = data_helper.load_customers()
+    df = data_helper.load_customers(st.session_state.config.login_customer_id)
     st.multiselect(
         "Selected Customers",
         df["customer_id"].apply(_format_customer_id)

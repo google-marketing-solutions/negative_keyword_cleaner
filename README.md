@@ -8,14 +8,9 @@ Google Ads account.
 
 ## Prerequisites
 
-1.
-A [Google Ads Developer token](https://developers.google.com/google-ads/api/docs/first-call/dev-token#:~:text=A%20developer%20token%20from%20Google,SETTINGS%20%3E%20SETUP%20%3E%20API%20Center.)
-1. A [Google Cloud Project](https://cloud.google.com/) with billing attached
-1.
-A [Consent Screen](https://console.cloud.google.com/apis/credentials/consent)
-on the GCP Console
-1.
-Create [OAuth2 Credentials](https://developers.google.com/identity/protocols/oauth2#1.-obtain-oauth-2.0-credentials-from-the-dynamic_data.setvar.console_name-.)
+1. A [Google Ads Developer token](https://developers.google.com/google-ads/api/docs/first-call/dev-token#:~:text=A%20developer%20token%20from%20Google,SETTINGS%20%3E%20SETUP%20%3E%20API%20Center.)
+2. A [Consent Screen](https://console.cloud.google.com/apis/credentials/consent) on the GCP Console
+3. Create [OAuth2 Credentials](https://developers.google.com/identity/protocols/oauth2#1.-obtain-oauth-2.0-credentials-from-the-dynamic_data.setvar.console_name-.)
 of type **Web**
 
 ## Deployment
@@ -40,7 +35,7 @@ use now, you may proceed with the steps below.
 3. In APIs & Service, enable **Artifact Registry API**
 4. In Cloud Shell
    ```
-   git clone https://professional-services.googlesource.com/solutions/ai_student_for_negative_keywords
+   git clone https://github.com/google-marketing-solutions/negative_keyword_cleaner
    cd ai_student_for_negative_keywords
    ```
 5. Replace the ... with the Client ID and Client Secret obtained in Step 2

@@ -80,15 +80,14 @@ def load_keywords(selected_customers: list) -> pd.DataFrame:
 
 
 @st.cache_resource(show_spinner=False)
-def load_customers() -> pd.DataFrame:
-  """
-  Load customers using the KeywordHelper.
+def load_customers(customer_ids: list[str]) -> pd.DataFrame:
+  """Loads customer data for a given list of IDs.
 
-  This function retrieves a list of customers from KeywordHelper and
-  returns them in a DataFrame.
+  Args:
+    customer_ids: A list of customer ID strings to fetch.
 
   Returns:
-  pd.DataFrame: A DataFrame containing customer IDs and names.
+    A pandas DataFrame containing the customer data.
   """
   kw_helper = KeywordHelper(st.session_state.config)
   if not kw_helper:
@@ -96,7 +95,7 @@ def load_customers() -> pd.DataFrame:
     return
 
   with st.spinner(text="Loading customers under MCC, please wait..."):
-    customers_report = kw_helper.get_customers()
+    customers_report = kw_helper.get_customers(customer_ids)
     if not customers_report:
       st.warning("No Customers found under MCC.")
       st.stop()

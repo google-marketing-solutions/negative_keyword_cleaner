@@ -79,7 +79,7 @@ resource "random_id" "vertexai_apikey_suffix" {
 }
 
 resource "google_apikeys_key" "vertexai" {
-  name         = "negcleaner-palm2-${random_id.vertexai_apikey_suffix.hex}"
+  name         = "negcleaner-gemini-${random_id.vertexai_apikey_suffix.hex}"
   display_name = "Negative Keywords Cleaner - Generative AI"
   project      = var.project_id
 

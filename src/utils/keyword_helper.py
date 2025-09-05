@@ -16,10 +16,11 @@ import re
 from enum import Enum
 from typing import Sequence, Union
 
+from gaarf import GaarfReport
 from gaarf.api_clients import GoogleAdsApiClient
 from gaarf.query_editor import QuerySpecification
-from gaarf.query_executor import AdsReportFetcher
-from gaarf.report import GaarfRow, GaarfReport
+from gaarf.report import GaarfRow
+from gaarf.report_fetcher import AdsReportFetcher
 from google.api_core import exceptions
 
 from utils import auth
@@ -29,7 +30,7 @@ from utils.gaarf_queries import CampaignNegativeKeywords
 from utils.gaarf_queries import CustomerNames
 from utils.gaarf_queries import KeywordLevel
 
-_GOOGLE_ADS_API_VERSION = "v18"
+_GOOGLE_ADS_API_VERSION = "v20"
 
 
 class MatchType(Enum):
@@ -59,7 +60,10 @@ def get_customer_ids(
   def fetch_customer_ids(query: str) -> Sequence[str]:
     """Fetches customer ids based on the provided query."""
     report_fetcher = AdsReportFetcher(ads_client, customer_id)
-    result = report_fetcher.fetch(QuerySpecification(query).generate())
+    result = report_fetcher.fetch(QuerySpecification(query,
+                                                     title="fetch_customer_ids")
+                                  .generate(),
+                                  customer_ids=customer_id, expand_mcc=True)
     return [row[0] if isinstance(row, GaarfRow) else row for row in result]
 
   # Standard query to fetch ENABLED and CANCELED accounts.
@@ -133,8 +137,8 @@ class Keyword:
 
 
 class KeywordHelper:
-
   def __init__(self, config: Config):
+    config = Config
     # Expand the mcc account to child accounts to initialize the report fetcher
     googleads_api_client = GoogleAdsApiClient(
         config_dict={
@@ -155,8 +159,18 @@ class KeywordHelper:
     except exceptions.InternalServerError as e:
       return None
 
-  def get_customers(self) -> GaarfReport:
-    customers = self.report_fetcher.fetch(CustomerNames())
+  def get_customers(self, customer_ids: list[str]) -> GaarfReport:
+    """Loads customer data for a given list of IDs.
+
+    Args:
+      customer_ids: A list of customer ID strings to fetch.
+
+    Returns:
+      A pandas DataFrame containing the customer data.
+    """
+    customers = self.report_fetcher.fetch(CustomerNames(),
+                                          customer_ids=customer_ids,
+                                          expand_mcc=True)
     return customers
 
   def get_neg_keywords(self, selected_customers: list) -> GaarfReport:
