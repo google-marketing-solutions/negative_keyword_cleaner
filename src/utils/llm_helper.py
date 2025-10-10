@@ -17,14 +17,14 @@ import os
 import langchain_google_genai as google_genai
 import langchain_openai as openai
 
-_GEMINI_MODEL = "gemini-1.5-flash-latest"
+_GEMINI_MODEL = "gemini-2.5-flash"
 _OPENAI_MODEL = "gpt-3.5-turbo"
 
 
 # Select the LLM to use based on the settings set in the UI.
 def select_llm(config):
   if config.google_api_key:
-    print("Picked Gemini 1.5 Flash model for summarizing")
+    print("Picked Gemini Flash model for summarizing")
     os.environ["GOOGLE_API_KEY"] = config.google_api_key
     return google_genai.ChatGoogleGenerativeAI(
         model=_GEMINI_MODEL,
