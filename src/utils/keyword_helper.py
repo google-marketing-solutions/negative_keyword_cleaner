@@ -25,10 +25,12 @@ from google.api_core import exceptions
 
 from utils import auth
 from utils.config import Config
+from utils.gaarf_queries import AccountNegativeKeywords
 from utils.gaarf_queries import AdgroupNegativeKeywords
 from utils.gaarf_queries import CampaignNegativeKeywords
 from utils.gaarf_queries import CustomerNames
 from utils.gaarf_queries import KeywordLevel
+from utils.gaarf_queries import PositiveKeywords
 
 _GOOGLE_ADS_API_VERSION = "v20"
 
@@ -173,7 +175,17 @@ class KeywordHelper:
                                           expand_mcc=True)
     return customers
 
-  def get_neg_keywords(self, selected_customers: list) -> GaarfReport:
+  def get_neg_keywords(self, selected_customers: list[str]) -> GaarfReport:
+    """Fetches negative keywords for the selected customers.
+
+    Args:
+      selected_customers: A list of customer strings, where each string starts
+        with the customer ID.
+
+    Returns:
+      A GaarfReport containing the adgroup, campaign, and account level
+      negative keywords.
+    """
     pattern = r"^(\d+)"
     customer_ids = []
     for customer in selected_customers:
@@ -187,8 +199,24 @@ class KeywordHelper:
     campaign_neg_kws = self.report_fetcher.fetch(
         CampaignNegativeKeywords(), customer_ids
     )
+    account_neg_kws = self.report_fetcher.fetch(
+        AccountNegativeKeywords(), customer_ids
+    )
 
-    return adgroup_neg_kws + campaign_neg_kws
+    return adgroup_neg_kws + campaign_neg_kws + account_neg_kws
+
+  def get_positive_keywords(self, selected_customers: list[str]) -> GaarfReport:
+    pattern = r"^(\d+)"
+    customer_ids = []
+    for customer in selected_customers:
+      match = re.match(pattern, customer)
+      if match:
+        customer_ids.append(match.group(1))
+
+    positive_kws = self.report_fetcher.fetch(
+        PositiveKeywords(), customer_ids
+    )
+    return positive_kws
 
   def clean_and_dedup(self, raw_keyword_data: GaarfReport) -> dict:
     all_keywords = {}

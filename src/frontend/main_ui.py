@@ -29,6 +29,7 @@ import time
 from typing import Callable
 
 import pandas as pd
+import requests
 import streamlit as st
 import yaml
 from langchain import prompts, chains
@@ -124,22 +125,7 @@ def _handle_advertiser_information(state_manager, llm):
         value=state_manager.get("company_homepage_url", ""),
         disabled=st.session_state.get("manual_context", False),
     )
-
-    if not company_homepage_url and not state_manager.get("manual_context"):
-      st.info(
-          "Once I have their website URL, I can directly read and "
-          "understand who this customer is.",
-          icon="🧑‍🎓",
-      )
-      st.write("If you want to give me advertiser information directly")
-      st.button(
-          "Add context manually",
-          on_click=_set_manual_context(state_manager),
-      )
-      st.stop()
-    else:
-      _process_company_homepage(company_homepage_url, state_manager, llm)
-
+    _process_company_homepage(company_homepage_url, state_manager, llm)
     _get_company_and_exclude_pitches(state_manager)
 
   _handle_context_ready(state_manager)
@@ -158,39 +144,52 @@ def _process_company_homepage(company_homepage_url, state_manager, llm):
   Returns:
       None
   """
+  if not company_homepage_url and not state_manager.get("manual_context"):
+    st.info(
+        "Once I have their website URL, I can directly read and "
+        "understand who this customer is.",
+        icon="🧑‍🎓",
+    )
+    st.write("If you want to give me advertiser information directly")
+    st.button(
+        "Add context manually",
+        on_click=_set_manual_context(state_manager),
+    )
+    st.stop()
 
-  if company_homepage_url or not state_manager.get("manual_context"):
-    if not re.match(_URL_REGEX, company_homepage_url) and not state_manager.get(
-        "manual_context"
-    ):
+  if company_homepage_url and not state_manager.get("manual_context"):
+    if not re.match(_URL_REGEX, company_homepage_url):
       st.error(
           "The URL is not in a valid format. Please check it and try again."
       )
       st.stop()
     else:
-      with st.spinner("I'm browsing their website..."):
-        homepage_docs = models.fetch_landing_page_text(company_homepage_url)
-        state_manager.set("homepage_fetched", True)
+      try:
+        with st.spinner("I'm browsing their website..."):
+          homepage_docs = models.fetch_landing_page_text(company_homepage_url)
+          state_manager.set("homepage_fetched", True)
+        st.success("Browsing done, I've collected enough info", icon="🧑‍🎓")
 
-      st.success("Browsing done, I've collected enough info", icon="🧑‍🎓")
-
-    with st.spinner(
-        "I'm now consolidating everything into an executive summary "
-        "(this will take a minute) ..."
-    ):
-      if not state_manager.get("homepage_summary", None):
-        homepage_summary = models.summarize_text(
-            homepage_docs, llm, verbose=True
-        ).strip()
-        state_manager.set("homepage_summary", homepage_summary)
-      else:
-        homepage_summary = state_manager.get("homepage_summary")
-
-      st.success(
-          "Summarizing done but feel free to correct anything that I've "
-          "written.",
-          icon="🎓",
-      )
+        with st.spinner(
+            "I'm now consolidating everything into an executive summary "
+            "(this will take a minute) ..."
+        ):
+          if not state_manager.get("homepage_summary", None):
+            homepage_summary = models.summarize_text(
+                homepage_docs, llm, verbose=True
+            ).strip()
+            state_manager.set("homepage_summary", homepage_summary)
+          st.success(
+              "Summarizing done but feel free to correct anything that I've "
+              "written.",
+              icon="🎓",
+          )
+      except requests.exceptions.RequestException as e:
+        st.error(f"Could not crawl the website: {e}")
+        if st.button("Add context manually"):
+            state_manager.set("manual_context", True)
+            st.rerun()
+        st.stop()
 
 
 def _get_company_and_exclude_pitches(state_manager):
@@ -483,8 +482,34 @@ def _score_keywords(state_manager):
       state_manager.get("evaluations") or _SCHEMA_EVALUATIONS
   )
   keywords = state_manager.get("sampled_keywords")
+  positive_keywords = st.session_state.get("positive_keywords", pd.DataFrame())
+
+  pre_scored_keywords = []
+  keywords_to_score = []
+
+  for _, row in keywords.iterrows():
+      is_positive_in_other_adgroup = False
+      if not positive_keywords.empty:
+          conflicting_positives = positive_keywords[
+              (positive_keywords["keyword"] == row["keyword"]) &
+              (positive_keywords["campaign_id"] == row["campaign_id"]) &
+              (positive_keywords["adgroup_id"] != row["adgroup_id"])
+          ]
+          if not conflicting_positives.empty:
+              is_positive_in_other_adgroup = True
+
+      if is_positive_in_other_adgroup:
+          pre_scored_keywords.append(models.KeywordEvaluation(
+              keyword=row["keyword"],
+              decision=models.ScoreDecision.KEEP,
+              reason="This keyword is positive in another adgroup in the same "
+              "campaign."
+          ))
+      else:
+          keywords_to_score.append(row["keyword"])
+
   formatted_keywords = json.dumps(
-      [keyword.strip("'\"") for keyword in keywords["keyword"].values.tolist()],
+      [keyword.strip("'\"") for keyword in keywords_to_score],
       ensure_ascii=False,
   )
   prompt = _create_prompt()
@@ -494,7 +519,7 @@ def _score_keywords(state_manager):
   if not scored_keywords:
     with st.spinner("Scoring a new batch of keywords..."):
       llm_chain = chains.LLMChain(prompt=prompt, llm=scoring_llm, verbose=True)
-      scored_keywords = llm_chain.run({
+      llm_scored_keywords_raw = llm_chain.run({
           "company_segment": "\n\n".join(
               filter(
                   None,
@@ -511,7 +536,14 @@ def _score_keywords(state_manager):
           ),
           "batch_size": state_manager.get("batch_size"),
       })
-      state_manager.set("scored_keywords", scored_keywords)
+
+      llm_scored_keywords = models.parse_scoring_response(
+          llm_scored_keywords_raw
+      )
+
+      # Combine pre-scored and LLM-scored keywords
+      all_scored_keywords = pre_scored_keywords + llm_scored_keywords
+      state_manager.set("scored_keywords", all_scored_keywords)
 
 
 def _create_prompt():
@@ -561,7 +593,7 @@ def _create_prompt():
 
 def _display_scored_keywords(state_manager):
   scored_keywords = state_manager.get("scored_keywords")
-  parsed_scored_keywords = models.parse_scoring_response(scored_keywords)
+  parsed_scored_keywords = scored_keywords
   state_manager.set("parsed_scored_keywords", parsed_scored_keywords)
 
   if not state_manager.get("evaluations"):
@@ -670,27 +702,52 @@ def _process_remaining_keywords(state_manager):
   scoring_kws_evals = list()
 
   filtered_keywords = state_manager.get("filtered_keywords")
+  positive_keywords = st.session_state.get("positive_keywords", pd.DataFrame())
   keywords_to_score = filtered_keywords
 
   while True:
     random_state = state_manager.get("random_state", models.get_random_state())
-    keywords = models.sample_batch(
+    keywords_batch = models.sample_batch(
         keywords_to_score,
         batch_size=50,
         exclude_keywords=scoring_seen_kws,
         random_state=random_state,
     )
-    if keywords.empty:
+    if keywords_batch.empty:
       scoring_bar.progress(1.0, text="")
       st.markdown("Done ✅")
       break
+
+    pre_scored_keywords = []
+    keywords_to_llm = []
+
+    for _, row in keywords_batch.iterrows():
+        is_positive_in_other_adgroup = False
+        if not positive_keywords.empty:
+            conflicting_positives = positive_keywords[
+                (positive_keywords["keyword"] == row["keyword"]) &
+                (positive_keywords["campaign_id"] == row["campaign_id"]) &
+                (positive_keywords["adgroup_id"] != row["adgroup_id"])
+            ]
+            if not conflicting_positives.empty:
+                is_positive_in_other_adgroup = True
+
+        if is_positive_in_other_adgroup:
+            pre_scored_keywords.append(models.KeywordEvaluation(
+                keyword=row["keyword"],
+                decision=models.ScoreDecision.KEEP,
+                reason="This keyword is positive in another adgroup in the "
+                "same campaign."
+            ))
+        else:
+            keywords_to_llm.append(row["keyword"])
 
     formatted_facts = models.format_scoring_fragment(
         state_manager.get("evaluations") or _SCHEMA_EVALUATIONS
     )
 
     formatted_keywords = yaml.dump(
-        keywords["keyword"].tolist(),
+        keywords_to_llm,
         allow_unicode=True,
         default_flow_style=False,
     )
@@ -698,7 +755,7 @@ def _process_remaining_keywords(state_manager):
     scoring_llm = llm_helper.select_llm(state_manager.get("config"))
     llm_chain = chains.LLMChain(prompt=prompt, llm=scoring_llm, verbose=True)
 
-    latest_scored_keywords = llm_chain.run({
+    latest_scored_keywords_raw = llm_chain.run({
         "company_segment": "\n\n".join(
             filter(
                 None,
@@ -717,14 +774,15 @@ def _process_remaining_keywords(state_manager):
     })
 
     try:
-      parsed_scored_keywords = models.parse_scoring_response(
-          latest_scored_keywords
+      llm_scored_keywords = models.parse_scoring_response(
+          latest_scored_keywords_raw
       )
     except yaml.scanner.ScannerError:
       continue
 
-    scoring_kws_evals.extend(parsed_scored_keywords)
-    scoring_seen_kws.update(keywords["keyword"].tolist())
+    all_scored_keywords = pre_scored_keywords + llm_scored_keywords
+    scoring_kws_evals.extend(all_scored_keywords)
+    scoring_seen_kws.update(keywords_batch["keyword"].tolist())
 
     curr = len(scoring_kws_evals)
     all_kws = len(keywords_to_score)
@@ -739,6 +797,7 @@ def _download_results(state_manager):
   if state_manager.get("scoring_kws_evals", None):
     _prepare_and_display_downloads(state_manager)
   _handle_stop_training(state_manager)
+  _display_consolidated_download(state_manager)
 
 
 def _format_customer_id(cid: int) -> str:
@@ -762,6 +821,7 @@ def _prepare_and_display_downloads(state_manager):
   df_to_remove, df_to_keep = _prepare_dataframes(
       cached_scoring_kws_evals, filtered_keywords
   )
+  st.session_state["df_to_remove_student"] = df_to_remove
 
   # Display DataFrames and download buttons
   st.dataframe(
@@ -792,6 +852,63 @@ def _prepare_and_display_downloads(state_manager):
       df_to_keep.to_csv(index=False),
       file_name="negative_keywords_to_keep.csv",
   )
+
+
+def _prepare_human_dataframe(state_manager):
+    """Prepares a DataFrame of human evaluations.
+
+    Args:
+      state_manager: The session state manager holding the application's state.
+
+    Returns:
+      A pandas DataFrame containing the human evaluations, or an empty DataFrame
+      if no filtered keywords are available.
+    """
+    # Retrieve filtered_keywords and evaluations from state_manager
+    filtered_keywords = state_manager.get("filtered_keywords", pd.DataFrame())
+    evaluations = state_manager.get("evaluations", {})
+
+    # Proceed only if filtered_keywords is not empty
+    if not filtered_keywords.empty:
+      formatted_evals = [
+          {
+              "keyword": kw,
+              "original_keyword": filtered_keywords.loc[
+                  filtered_keywords["keyword"] == kw, "original_keyword"
+              ].values[0],
+              "human_decision": str(human_eval.decision),
+              "human_reason": human_eval.reason,
+              "campaign_name": filtered_keywords.loc[
+                  filtered_keywords["keyword"] == kw, "campaign_name"
+              ].values[0],
+              "campaign_id": filtered_keywords.loc[
+                  filtered_keywords["keyword"] == kw, "campaign_id"
+              ].values[0],
+              "adgroup_id": filtered_keywords.loc[
+                  filtered_keywords["keyword"] == kw, "adgroup_id"
+              ].values[0],
+              "Source": "Human",
+          }
+          for kw, human_eval in evaluations.items()
+          if kw in filtered_keywords["keyword"].values
+      ]
+      return pd.DataFrame(formatted_evals)
+    return pd.DataFrame()
+
+
+def _display_consolidated_download():
+    st.header("Consolidated Download")
+    df_student = st.session_state.get("df_to_remove_student", pd.DataFrame())
+    df_human = st.session_state.get("df_to_remove_human", pd.DataFrame())
+
+    if not df_student.empty or not df_human.empty:
+        df_consolidated = pd.concat([df_student, df_human], ignore_index=True)
+        st.dataframe(df_consolidated, height=200)
+        st.download_button(
+            "Download consolidated keywords to remove",
+            df_consolidated.to_csv(index=False),
+            file_name="consolidated_negative_keywords_to_remove.csv",
+        )
 
 
 def _prepare_dataframes(cached_scoring_kws_evals, filtered_keywords):
@@ -837,6 +954,7 @@ def _prepare_dataframes(cached_scoring_kws_evals, filtered_keywords):
           ),
           "Status": "Removed",
           "Student Reason": student_eval.reason,
+          "Source": "Student",
       }
       for student_eval in cached_scoring_kws_evals
       if student_eval.decision == models.ScoreDecision.REMOVE
@@ -863,6 +981,7 @@ def _prepare_dataframes(cached_scoring_kws_evals, filtered_keywords):
           ),
           "Status": "Enabled",
           "Student Reason": student_eval.reason,
+          "Source": "Student",
           **get_df_values(
               filtered_keywords,
               student_eval.keyword,
@@ -890,40 +1009,15 @@ def _handle_stop_training(state_manager):
   )
 
   if st.button("Stop the training", key="stop_training"):
-    # Retrieve filtered_keywords and evaluations from state_manager
-    filtered_keywords = state_manager.get("filtered_keywords", pd.DataFrame())
-    evaluations = state_manager.get("evaluations", {})
-
-    # Proceed only if filtered_keywords is not empty
-    if not filtered_keywords.empty:
-      formatted_evals = [
-          {
-              "keyword": kw,
-              "original_keyword": filtered_keywords.loc[
-                  filtered_keywords["keyword"] == kw, "original_keyword"
-              ].values[0],
-              "human_decision": human_eval.decision,
-              "human_reason": human_eval.reason,
-              "campaign_name": filtered_keywords.loc[
-                  filtered_keywords["keyword"] == kw, "campaign_name"
-              ].values[0],
-              "campaign_id": filtered_keywords.loc[
-                  filtered_keywords["keyword"] == kw, "campaign_id"
-              ].values[0],
-              "adgroup_id": filtered_keywords.loc[
-                  filtered_keywords["keyword"] == kw, "adgroup_id"
-              ].values[0],
-          }
-          for kw, human_eval in evaluations.items()
-          if kw in filtered_keywords["keyword"].values
-      ]
-      df_output = pd.DataFrame(formatted_evals)
-
-      st.dataframe(df_output, height=200)
-      st.download_button(
-          "Download human scorings",
-          df_output.to_csv(index=False),
-          file_name="negative_keywords_used_to_train_student.csv",
-      )
+    df_output = _prepare_human_dataframe(state_manager)
+    if not df_output.empty:
+        df_to_remove_human = df_output[df_output["human_decision"] == "REMOVE"]
+        st.session_state["df_to_remove_human"] = df_to_remove_human
+        st.dataframe(df_output, height=200)
+        st.download_button(
+            "Download human scorings",
+            df_output.to_csv(index=False),
+            file_name="negative_keywords_used_to_train_student.csv",
+        )
     else:
       st.warning("No filtered keywords are available.")

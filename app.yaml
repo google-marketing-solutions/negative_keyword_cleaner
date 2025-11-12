@@ -15,7 +15,7 @@
 runtime: custom
 env: flex
 
-instance_class: F2
+instance_class: F4
 
 network:
   session_affinity: true

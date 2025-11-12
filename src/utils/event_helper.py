@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import logging
+import pathlib
 from collections import OrderedDict
 from typing import Callable, Any
 
@@ -20,6 +22,10 @@ import streamlit as st
 from frontend import models
 from utils import config
 from utils.config import Config
+
+EVALUATIONS_FILE = (
+    pathlib.Path(__file__).parents[2] / "evaluations.json"
+).absolute()
 
 
 class session_state_manager:
@@ -59,6 +65,8 @@ class session_state_manager:
     if "batch_size" not in self.list_keys():
       batch_size = self.get("config").batch_size or 15
       self.set("batch_size", batch_size)
+    if "evaluations" not in self.list_keys():
+        self.set("evaluations", self.load_evaluations_from_disk())
 
   def initialize(self, key, default_value):
     """Initialize a session state variable if it does not exist."""
@@ -92,6 +100,26 @@ class session_state_manager:
     """List all keys in the session state."""
     return list(st.session_state.keys())
 
+  def load_evaluations_from_disk(self):
+    """Loads evaluations from a JSON file."""
+    if EVALUATIONS_FILE.exists():
+        with open(EVALUATIONS_FILE, "r") as f:
+            evals_data = json.load(f)
+            return OrderedDict(
+                (k, models.KeywordEvaluation(**v))
+                for k, v in evals_data.items()
+            )
+    return OrderedDict()
+
+  def save_evaluations_to_disk(self):
+    """Saves evaluations to a JSON file."""
+    evaluations = self.get("evaluations", {})
+    evals_data = {
+        k: v.__dict__ for k, v in evaluations.items()
+    }
+    with open(EVALUATIONS_FILE, "w") as f:
+        json.dump(evals_data, f)
+
 
 state_manager = session_state_manager()
 
@@ -120,6 +148,7 @@ def handle_selected_customers() -> None:
   and clearing scored keywords.
   """
   reset_batch_props()
+  reset_evaluations()
   state_manager.set("scored_keywords", None)
 
 
@@ -129,6 +158,7 @@ def handle_selected_campaigns() -> None:
   and clearing scored keywords.
   """
   reset_batch_props()
+  reset_evaluations()
   state_manager.set("scored_keywords", None)
 
 
@@ -187,6 +217,7 @@ def reset_evaluations() -> None:
   This is used to clear any existing evaluations stored in the session state.
   """
   state_manager.set("evaluations", OrderedDict())
+  state_manager.save_evaluations_to_disk()
 
 
 def reset_eval_pairs() -> None:
@@ -213,6 +244,7 @@ def _save_human_eval(
   evaluation = state_manager.get("evaluations", {})
   evaluation[human_eval.keyword] = human_eval
   state_manager.set("evaluations", evaluation)
+  state_manager.save_evaluations_to_disk()
 
   scored_set = state_manager.get("scored_set")
   scored_set.add(human_eval.keyword)
