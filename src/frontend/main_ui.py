@@ -43,7 +43,7 @@ from utils import llm_helper
 from utils.event_helper import session_state_manager
 
 logging.getLogger().setLevel(logging.DEBUG)
-logger = logging.Logger(__name__)
+logger = logging.getLogger(__name__)
 
 _SCHEMA_EVALUATIONS = {}
 
@@ -187,8 +187,8 @@ def _process_company_homepage(company_homepage_url, state_manager, llm):
       except requests.exceptions.RequestException as e:
         st.error(f"Could not crawl the website: {e}")
         if st.button("Add context manually"):
-            state_manager.set("manual_context", True)
-            st.rerun()
+          state_manager.set("manual_context", True)
+          st.rerun()
         st.stop()
 
 
@@ -478,6 +478,9 @@ def _sample_keywords(state_manager):
 
 
 def _score_keywords(state_manager):
+  if state_manager.get("scored_keywords", None):
+    return
+
   formatted_facts = models.format_scoring_fragment(
       state_manager.get("evaluations") or _SCHEMA_EVALUATIONS
   )
@@ -488,36 +491,38 @@ def _score_keywords(state_manager):
   keywords_to_score = []
 
   for _, row in keywords.iterrows():
-      is_positive_in_other_adgroup = False
-      if not positive_keywords.empty:
-          conflicting_positives = positive_keywords[
-              (positive_keywords["keyword"] == row["keyword"]) &
-              (positive_keywords["campaign_id"] == row["campaign_id"]) &
-              (positive_keywords["adgroup_id"] != row["adgroup_id"])
-          ]
-          if not conflicting_positives.empty:
-              is_positive_in_other_adgroup = True
+    is_positive_in_other_adgroup = False
+    if not positive_keywords.empty:
+      conflicting_positives = positive_keywords[
+          (positive_keywords["keyword"] == row["keyword"])
+          & (positive_keywords["campaign_id"] == row["campaign_id"])
+          & (positive_keywords["adgroup_id"] != row["adgroup_id"])
+      ]
+      if not conflicting_positives.empty:
+        is_positive_in_other_adgroup = True
 
-      if is_positive_in_other_adgroup:
-          pre_scored_keywords.append(models.KeywordEvaluation(
+    if is_positive_in_other_adgroup:
+      pre_scored_keywords.append(
+          models.KeywordEvaluation(
               keyword=row["keyword"],
               decision=models.ScoreDecision.KEEP,
-              reason="This keyword is positive in another adgroup in the same "
-              "campaign."
-          ))
-      else:
-          keywords_to_score.append(row["keyword"])
+              reason=(
+                  "This keyword is positive in another adgroup in the same "
+                  "campaign."
+              ),
+          )
+      )
+    else:
+      keywords_to_score.append(row["keyword"])
 
-  formatted_keywords = json.dumps(
-      [keyword.strip("'\"") for keyword in keywords_to_score],
-      ensure_ascii=False,
-  )
-  prompt = _create_prompt()
-  scoring_llm = llm_helper.select_llm(state_manager.get("config"))
-
-  scored_keywords = state_manager.get("scored_keywords", None)
-  if not scored_keywords:
-    with st.spinner("Scoring a new batch of keywords..."):
+  with st.spinner("Scoring a new batch of keywords..."):
+    if keywords_to_score:
+      formatted_keywords = json.dumps(
+          [keyword.strip("'\"") for keyword in keywords_to_score],
+          ensure_ascii=False,
+      )
+      prompt = _create_prompt()
+      scoring_llm = llm_helper.select_llm(state_manager.get("config"))
       llm_chain = chains.LLMChain(prompt=prompt, llm=scoring_llm, verbose=True)
       llm_scored_keywords_raw = llm_chain.run({
           "company_segment": "\n\n".join(
@@ -531,19 +536,15 @@ def _score_keywords(state_manager):
           ),
           "facts_segment": formatted_facts,
           "keywords_segment": formatted_keywords,
-          "decision_allowed_values": ", ".join(
-              x.value for x in models.ScoreDecision
-          ),
-          "batch_size": state_manager.get("batch_size"),
       })
-
       llm_scored_keywords = models.parse_scoring_response(
           llm_scored_keywords_raw
       )
+    else:
+      llm_scored_keywords = []
 
-      # Combine pre-scored and LLM-scored keywords
-      all_scored_keywords = pre_scored_keywords + llm_scored_keywords
-      state_manager.set("scored_keywords", all_scored_keywords)
+    all_scored_keywords = pre_scored_keywords + llm_scored_keywords
+    state_manager.set("scored_keywords", all_scored_keywords)
 
 
 def _create_prompt():
@@ -584,8 +585,6 @@ def _create_prompt():
           "company_segment",
           "facts_segment",
           "keywords_segment",
-          "decision_allowed_values",
-          "batch_size",
       ],
   )
   return prompt
@@ -722,25 +721,29 @@ def _process_remaining_keywords(state_manager):
     keywords_to_llm = []
 
     for _, row in keywords_batch.iterrows():
-        is_positive_in_other_adgroup = False
-        if not positive_keywords.empty:
-            conflicting_positives = positive_keywords[
-                (positive_keywords["keyword"] == row["keyword"]) &
-                (positive_keywords["campaign_id"] == row["campaign_id"]) &
-                (positive_keywords["adgroup_id"] != row["adgroup_id"])
-            ]
-            if not conflicting_positives.empty:
-                is_positive_in_other_adgroup = True
+      is_positive_in_other_adgroup = False
+      if not positive_keywords.empty:
+        conflicting_positives = positive_keywords[
+            (positive_keywords["keyword"] == row["keyword"])
+            & (positive_keywords["campaign_id"] == row["campaign_id"])
+            & (positive_keywords["adgroup_id"] != row["adgroup_id"])
+        ]
+        if not conflicting_positives.empty:
+          is_positive_in_other_adgroup = True
 
-        if is_positive_in_other_adgroup:
-            pre_scored_keywords.append(models.KeywordEvaluation(
+      if is_positive_in_other_adgroup:
+        pre_scored_keywords.append(
+            models.KeywordEvaluation(
                 keyword=row["keyword"],
                 decision=models.ScoreDecision.KEEP,
-                reason="This keyword is positive in another adgroup in the "
-                "same campaign."
-            ))
-        else:
-            keywords_to_llm.append(row["keyword"])
+                reason=(
+                    "This keyword is positive in another adgroup in the "
+                    "same campaign."
+                ),
+            )
+        )
+      else:
+        keywords_to_llm.append(row["keyword"])
 
     formatted_facts = models.format_scoring_fragment(
         state_manager.get("evaluations") or _SCHEMA_EVALUATIONS
@@ -767,10 +770,6 @@ def _process_remaining_keywords(state_manager):
         ),
         "facts_segment": formatted_facts,
         "keywords_segment": formatted_keywords,
-        "decision_allowed_values": ", ".join(
-            x.value for x in models.ScoreDecision
-        ),
-        "batch_size": state_manager.get("batch_size"),
     })
 
     try:
@@ -786,8 +785,9 @@ def _process_remaining_keywords(state_manager):
 
     curr = len(scoring_kws_evals)
     all_kws = len(keywords_to_score)
-    scoring_bar.progress(value=curr / all_kws,
-                         text=scoring_progress_text + f" {curr}/{all_kws}")
+    scoring_bar.progress(
+        value=curr / all_kws, text=scoring_progress_text + f" {curr}/{all_kws}"
+    )
 
   if scoring_kws_evals:
     state_manager.set("scoring_kws_evals", scoring_kws_evals)
@@ -797,7 +797,7 @@ def _download_results(state_manager):
   if state_manager.get("scoring_kws_evals", None):
     _prepare_and_display_downloads(state_manager)
   _handle_stop_training(state_manager)
-  _display_consolidated_download(state_manager)
+  _display_consolidated_download()
 
 
 def _format_customer_id(cid: int) -> str:
@@ -855,60 +855,60 @@ def _prepare_and_display_downloads(state_manager):
 
 
 def _prepare_human_dataframe(state_manager):
-    """Prepares a DataFrame of human evaluations.
+  """Prepares a DataFrame of human evaluations.
 
-    Args:
-      state_manager: The session state manager holding the application's state.
+  Args:
+    state_manager: The session state manager holding the application's state.
 
-    Returns:
-      A pandas DataFrame containing the human evaluations, or an empty DataFrame
-      if no filtered keywords are available.
-    """
-    # Retrieve filtered_keywords and evaluations from state_manager
-    filtered_keywords = state_manager.get("filtered_keywords", pd.DataFrame())
-    evaluations = state_manager.get("evaluations", {})
+  Returns:
+    A pandas DataFrame containing the human evaluations, or an empty DataFrame
+    if no filtered keywords are available.
+  """
+  # Retrieve filtered_keywords and evaluations from state_manager
+  filtered_keywords = state_manager.get("filtered_keywords", pd.DataFrame())
+  evaluations = state_manager.get("evaluations", {})
 
-    # Proceed only if filtered_keywords is not empty
-    if not filtered_keywords.empty:
-      formatted_evals = [
-          {
-              "keyword": kw,
-              "original_keyword": filtered_keywords.loc[
-                  filtered_keywords["keyword"] == kw, "original_keyword"
-              ].values[0],
-              "human_decision": str(human_eval.decision),
-              "human_reason": human_eval.reason,
-              "campaign_name": filtered_keywords.loc[
-                  filtered_keywords["keyword"] == kw, "campaign_name"
-              ].values[0],
-              "campaign_id": filtered_keywords.loc[
-                  filtered_keywords["keyword"] == kw, "campaign_id"
-              ].values[0],
-              "adgroup_id": filtered_keywords.loc[
-                  filtered_keywords["keyword"] == kw, "adgroup_id"
-              ].values[0],
-              "Source": "Human",
-          }
-          for kw, human_eval in evaluations.items()
-          if kw in filtered_keywords["keyword"].values
-      ]
-      return pd.DataFrame(formatted_evals)
-    return pd.DataFrame()
+  # Proceed only if filtered_keywords is not empty
+  if not filtered_keywords.empty:
+    formatted_evals = [
+        {
+            "keyword": kw,
+            "original_keyword": filtered_keywords.loc[
+                filtered_keywords["keyword"] == kw, "original_keyword"
+            ].values[0],
+            "human_decision": str(human_eval.decision),
+            "human_reason": human_eval.reason,
+            "campaign_name": filtered_keywords.loc[
+                filtered_keywords["keyword"] == kw, "campaign_name"
+            ].values[0],
+            "campaign_id": filtered_keywords.loc[
+                filtered_keywords["keyword"] == kw, "campaign_id"
+            ].values[0],
+            "adgroup_id": filtered_keywords.loc[
+                filtered_keywords["keyword"] == kw, "adgroup_id"
+            ].values[0],
+            "Source": "Human",
+        }
+        for kw, human_eval in evaluations.items()
+        if kw in filtered_keywords["keyword"].values
+    ]
+    return pd.DataFrame(formatted_evals)
+  return pd.DataFrame()
 
 
 def _display_consolidated_download():
-    st.header("Consolidated Download")
-    df_student = st.session_state.get("df_to_remove_student", pd.DataFrame())
-    df_human = st.session_state.get("df_to_remove_human", pd.DataFrame())
+  st.header("Consolidated Download")
+  df_student = st.session_state.get("df_to_remove_student", pd.DataFrame())
+  df_human = st.session_state.get("df_to_remove_human", pd.DataFrame())
 
-    if not df_student.empty or not df_human.empty:
-        df_consolidated = pd.concat([df_student, df_human], ignore_index=True)
-        st.dataframe(df_consolidated, height=200)
-        st.download_button(
-            "Download consolidated keywords to remove",
-            df_consolidated.to_csv(index=False),
-            file_name="consolidated_negative_keywords_to_remove.csv",
-        )
+  if not df_student.empty or not df_human.empty:
+    df_consolidated = pd.concat([df_student, df_human], ignore_index=True)
+    st.dataframe(df_consolidated, height=200)
+    st.download_button(
+        "Download consolidated keywords to remove",
+        df_consolidated.to_csv(index=False),
+        file_name="consolidated_negative_keywords_to_remove.csv",
+    )
 
 
 def _prepare_dataframes(cached_scoring_kws_evals, filtered_keywords):
@@ -1011,13 +1011,13 @@ def _handle_stop_training(state_manager):
   if st.button("Stop the training", key="stop_training"):
     df_output = _prepare_human_dataframe(state_manager)
     if not df_output.empty:
-        df_to_remove_human = df_output[df_output["human_decision"] == "REMOVE"]
-        st.session_state["df_to_remove_human"] = df_to_remove_human
-        st.dataframe(df_output, height=200)
-        st.download_button(
-            "Download human scorings",
-            df_output.to_csv(index=False),
-            file_name="negative_keywords_used_to_train_student.csv",
-        )
+      df_to_remove_human = df_output[df_output["human_decision"] == "REMOVE"]
+      st.session_state["df_to_remove_human"] = df_to_remove_human
+      st.dataframe(df_output, height=200)
+      st.download_button(
+          "Download human scorings",
+          df_output.to_csv(index=False),
+          file_name="negative_keywords_used_to_train_student.csv",
+      )
     else:
       st.warning("No filtered keywords are available.")

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Module containing GAARF queries for negative keywords."""
+
 from enum import Enum
 
 from gaarf.base_query import BaseQuery
@@ -39,7 +41,7 @@ class CustomerNames(BaseQuery):
   """
 
   def __init__(self) -> None:
-    self.query_text = f"""
+    self.query_text = """
             SELECT
                 customer_client.id,
                 customer_client.descriptive_name

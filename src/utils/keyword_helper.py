@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Module containing helper classes and functions for keywords."""
+
 import re
 from enum import Enum
 from typing import Sequence, Union
@@ -21,7 +23,6 @@ from gaarf.api_clients import GoogleAdsApiClient
 from gaarf.query_editor import QuerySpecification
 from gaarf.report import GaarfRow
 from gaarf.report_fetcher import AdsReportFetcher
-from google.api_core import exceptions
 
 from utils import auth
 from utils.config import Config
@@ -53,7 +54,8 @@ def get_customer_ids(
   Args:
       ads_client: GoogleAdsApiClient used for connection.
       customer_id: MCC account_id.
-      customer_ids_query: The query to be executed for the aforementioned MCC account.
+      customer_ids_query: The query to be executed for the aforementioned
+        MCC account.
 
   Returns:
       All customer_ids from MCC satisfying the condition.
@@ -98,6 +100,7 @@ class Customer:
 
 
 class Keyword:
+  """Represents a keyword with its properties."""
 
   def __init__(
       self,
@@ -139,8 +142,9 @@ class Keyword:
 
 
 class KeywordHelper:
+  """Helper class for fetching and processing keywords."""
+
   def __init__(self, config: Config):
-    config = Config
     # Expand the mcc account to child accounts to initialize the report fetcher
     googleads_api_client = GoogleAdsApiClient(
         config_dict={
@@ -153,13 +157,10 @@ class KeywordHelper:
         },
         version=_GOOGLE_ADS_API_VERSION,
     )
-    try:
-      customer_ids = get_customer_ids(
-          googleads_api_client, config.login_customer_id
-      )
-      self.report_fetcher = AdsReportFetcher(googleads_api_client, customer_ids)
-    except exceptions.InternalServerError as e:
-      return None
+    customer_ids = get_customer_ids(
+        googleads_api_client, config.login_customer_id
+    )
+    self.report_fetcher = AdsReportFetcher(googleads_api_client, customer_ids)
 
   def get_customers(self, customer_ids: list[str]) -> GaarfReport:
     """Loads customer data for a given list of IDs.
