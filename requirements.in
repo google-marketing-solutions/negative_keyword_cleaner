@@ -11,10 +11,8 @@ openai
 pyyaml
 beautifulsoup4
 tiktoken
-transformers
 streamlit-elements
 PyJWT
-matplotlib
 google-auth-oauthlib
 google-auth-httplib2
 google-cloud-aiplatform
