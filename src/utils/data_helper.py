@@ -14,6 +14,7 @@
 
 import pandas as pd
 import streamlit as st
+from google.api_core import exceptions
 
 from utils.keyword_helper import KeywordHelper, Customer
 
@@ -32,11 +33,11 @@ def load_keywords(selected_customers: list) -> pd.DataFrame:
   Returns:
   pd.DataFrame: A DataFrame containing the negative keywords along with additional information.
   """
-  kw_helper = KeywordHelper(st.session_state.config)
-
-  if not kw_helper:
-    st.error("An internal error occurred. Could not load KeywordHelper.")
-    return
+  try:
+    kw_helper = KeywordHelper(st.session_state.config)
+  except exceptions.GoogleAPIError as e:
+    st.error(f"Could not initialize the Google Ads client: {e}")
+    st.stop()
 
   with st.spinner(
       text="Loading negative keywords... This may take a few minutes"
@@ -124,10 +125,11 @@ def load_customers(customer_ids: list[str]) -> pd.DataFrame:
   Returns:
     A pandas DataFrame containing the customer data.
   """
-  kw_helper = KeywordHelper(st.session_state.config)
-  if not kw_helper:
-    st.error("An internal error occurred. Could not load KeywordHelper.")
-    return
+  try:
+    kw_helper = KeywordHelper(st.session_state.config)
+  except exceptions.GoogleAPIError as e:
+    st.error(f"Could not initialize the Google Ads client: {e}")
+    st.stop()
 
   with st.spinner(text="Loading customers under MCC, please wait..."):
     customers_report = kw_helper.get_customers(customer_ids)

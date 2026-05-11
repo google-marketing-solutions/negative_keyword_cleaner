@@ -44,7 +44,7 @@ def main():
   if st.session_state.valid_config:
     main_ui.display_page(state_manager)
   else:
-    settings_ui.display_page(state_manager)
+    settings_ui.display_page()
 
 
 if __name__ == "__main__":

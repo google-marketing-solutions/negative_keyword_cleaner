@@ -23,7 +23,6 @@ from typing import Optional, Any, Dict, List
 import pandas as pd
 import requests
 import streamlit as st
-import streamlit.components.v1 as components
 import yaml
 from bs4 import BeautifulSoup
 from langchain.chains import summarize
@@ -31,7 +30,6 @@ from langchain.docstore.document import Document
 from langchain.llms.base import LLM
 from langchain.prompts import PromptTemplate
 from langchain.text_splitter import CharacterTextSplitter
-from requests.exceptions import HTTPError, SSLError
 
 logger = logging.getLogger(__name__)
 
@@ -85,72 +83,26 @@ def fetch_landing_page_text(url: str) -> List[Document]:
   Returns:
   List[Document]: A list of Documents containing the text from the landing page.
   """
-  content = ""
-  try:
-    # Since we are making requests from a datacenter,
-    # the following request sometimes get rejected.
-    #
-    # To avoid this, we are mimicking an actual browser
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
-            " AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0"
-            " Safari/537.36"
-        ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Connection": "keep-alive",
-        "DNT": "1",  # Do Not Track Request Header
-        "Upgrade-Insecure-Requests": "1",
-    }
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
+  headers = {
+      "User-Agent": (
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
+          " AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0"
+          " Safari/537.36"
+      ),
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Connection": "keep-alive",
+      "DNT": "1",
+      "Upgrade-Insecure-Requests": "1",
+  }
+  response = requests.get(url, headers=headers, timeout=15)
+  response.raise_for_status()
 
-    text_content = response.text
-    logger.info(text_content)
-    soup = BeautifulSoup(text_content, features="html.parser")
-    texts = soup.find_all(text=True)
-    content = "\n".join(
-        str(t).strip() for t in texts if t.parent.name not in _HTML_EXCLUDE_TAGS
-    ).strip()
-  except (HTTPError, SSLError) as err:
-    # Fallback to Client-Side Fetch
-    st.warning("Server-side fetch failed. Trying client-side fetch...")
-
-    js_code = """
-            <script>
-            const url = window.Streamlit.getUrlParams()['url'];  
-
-            fetch(url)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error: ${response.status}`);
-                    }
-                    return response.text();
-                })
-                .then(html => {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    const textContent = Array.from(doc.body.querySelectorAll('*')) // Select all elements
-                        .filter(el => !_HTML_EXCLUDE_TAGS.includes(el.tagName.toLowerCase())) 
-                        .map(el => el.textContent.trim())
-                        .join('\\n');
-
-                    window.Streamlit.setComponentValue(textContent);
-                })
-                .catch(error => {
-                    window.Streamlit.setComponentValue('Error: ' + error.message);
-                });
-            </script>
-        """
-
-    component_value = components.html(js_code, height=0, width=0)
-
-    if component_value.text.startswith("Error:"):
-      st.error(component_value)
-      st.stop()
-
-    content = component_value
+  soup = BeautifulSoup(response.text, features="html.parser")
+  texts = soup.find_all(string=True)
+  content = "\n".join(
+      str(t).strip() for t in texts if t.parent.name not in _HTML_EXCLUDE_TAGS
+  ).strip()
 
   # Splits into multiple documents to fit into LLM context.
   text_splitter = CharacterTextSplitter()
@@ -345,10 +297,10 @@ def parse_scoring_response(response: str) -> List[KeywordEvaluation]:
     return []
 
   try:
-    data = yaml.safe_load(response)
+    yaml.safe_load(response)
   except yaml.parser.ParserError as e:
     logger.error(f"Error parsing YAML data: {e}")
-    logger.error(f"Original Content: {data}")
+    logger.error(f"Original Content: {response}")
     return []
 
   outputs = []
