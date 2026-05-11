@@ -18,9 +18,7 @@ dependencies = [
     "pyyaml",
     "beautifulsoup4",
     "tiktoken",
-    "transformers",
     "streamlit-elements",
-    "matplotlib",
     "google-auth-oauthlib",
     "google-auth-httplib2",
 ]
@@ -41,8 +39,11 @@ build-backend = "setuptools.build_meta"
 [tool.isort]
 profile = "black"
 
-[tools.setuptools]
-packages = ["frontend/*", "pages/*"]
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pyink]
 # Formatting configuration to follow Google style-guide
