@@ -43,7 +43,7 @@ from utils import llm_helper
 from utils.event_helper import session_state_manager
 
 logging.getLogger().setLevel(logging.DEBUG)
-logger = logging.Logger(__name__)
+logger = logging.getLogger(__name__)
 
 _SCHEMA_EVALUATIONS = {}
 
@@ -478,6 +478,9 @@ def _sample_keywords(state_manager):
 
 
 def _score_keywords(state_manager):
+  if state_manager.get("scored_keywords", None):
+    return
+
   formatted_facts = models.format_scoring_fragment(
       state_manager.get("evaluations") or _SCHEMA_EVALUATIONS
   )
@@ -488,36 +491,34 @@ def _score_keywords(state_manager):
   keywords_to_score = []
 
   for _, row in keywords.iterrows():
-      is_positive_in_other_adgroup = False
-      if not positive_keywords.empty:
-          conflicting_positives = positive_keywords[
-              (positive_keywords["keyword"] == row["keyword"]) &
-              (positive_keywords["campaign_id"] == row["campaign_id"]) &
-              (positive_keywords["adgroup_id"] != row["adgroup_id"])
-          ]
-          if not conflicting_positives.empty:
-              is_positive_in_other_adgroup = True
+    is_positive_in_other_adgroup = False
+    if not positive_keywords.empty:
+      conflicting_positives = positive_keywords[
+          (positive_keywords["keyword"] == row["keyword"]) &
+          (positive_keywords["campaign_id"] == row["campaign_id"]) &
+          (positive_keywords["adgroup_id"] != row["adgroup_id"])
+      ]
+      if not conflicting_positives.empty:
+        is_positive_in_other_adgroup = True
 
-      if is_positive_in_other_adgroup:
-          pre_scored_keywords.append(models.KeywordEvaluation(
-              keyword=row["keyword"],
-              decision=models.ScoreDecision.KEEP,
-              reason="This keyword is positive in another adgroup in the same "
-              "campaign."
-          ))
-      else:
-          keywords_to_score.append(row["keyword"])
+    if is_positive_in_other_adgroup:
+      pre_scored_keywords.append(models.KeywordEvaluation(
+          keyword=row["keyword"],
+          decision=models.ScoreDecision.KEEP,
+          reason="This keyword is positive in another adgroup in the same "
+          "campaign."
+      ))
+    else:
+      keywords_to_score.append(row["keyword"])
 
-  formatted_keywords = json.dumps(
-      [keyword.strip("'\"") for keyword in keywords_to_score],
-      ensure_ascii=False,
-  )
-  prompt = _create_prompt()
-  scoring_llm = llm_helper.select_llm(state_manager.get("config"))
-
-  scored_keywords = state_manager.get("scored_keywords", None)
-  if not scored_keywords:
-    with st.spinner("Scoring a new batch of keywords..."):
+  with st.spinner("Scoring a new batch of keywords..."):
+    if keywords_to_score:
+      formatted_keywords = json.dumps(
+          [keyword.strip("'\"") for keyword in keywords_to_score],
+          ensure_ascii=False,
+      )
+      prompt = _create_prompt()
+      scoring_llm = llm_helper.select_llm(state_manager.get("config"))
       llm_chain = chains.LLMChain(prompt=prompt, llm=scoring_llm, verbose=True)
       llm_scored_keywords_raw = llm_chain.run({
           "company_segment": "\n\n".join(
@@ -531,19 +532,15 @@ def _score_keywords(state_manager):
           ),
           "facts_segment": formatted_facts,
           "keywords_segment": formatted_keywords,
-          "decision_allowed_values": ", ".join(
-              x.value for x in models.ScoreDecision
-          ),
-          "batch_size": state_manager.get("batch_size"),
       })
-
       llm_scored_keywords = models.parse_scoring_response(
           llm_scored_keywords_raw
       )
+    else:
+      llm_scored_keywords = []
 
-      # Combine pre-scored and LLM-scored keywords
-      all_scored_keywords = pre_scored_keywords + llm_scored_keywords
-      state_manager.set("scored_keywords", all_scored_keywords)
+    all_scored_keywords = pre_scored_keywords + llm_scored_keywords
+    state_manager.set("scored_keywords", all_scored_keywords)
 
 
 def _create_prompt():
@@ -584,8 +581,6 @@ def _create_prompt():
           "company_segment",
           "facts_segment",
           "keywords_segment",
-          "decision_allowed_values",
-          "batch_size",
       ],
   )
   return prompt
@@ -767,10 +762,6 @@ def _process_remaining_keywords(state_manager):
         ),
         "facts_segment": formatted_facts,
         "keywords_segment": formatted_keywords,
-        "decision_allowed_values": ", ".join(
-            x.value for x in models.ScoreDecision
-        ),
-        "batch_size": state_manager.get("batch_size"),
     })
 
     try:
@@ -797,7 +788,7 @@ def _download_results(state_manager):
   if state_manager.get("scoring_kws_evals", None):
     _prepare_and_display_downloads(state_manager)
   _handle_stop_training(state_manager)
-  _display_consolidated_download(state_manager)
+  _display_consolidated_download()
 
 
 def _format_customer_id(cid: int) -> str:

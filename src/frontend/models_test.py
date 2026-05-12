@@ -15,9 +15,19 @@
 import collections
 import unittest
 
-import models
+from frontend import models
 
-EXPECTED_RESPONSE = """
+# format_scoring_fragment rewrites "reason:" to "reason::" by design.
+EXPECTED_FRAGMENT = (
+    "- keyword: keyword1\n"
+    "  reason:: Reason for keeping keyword1\n"
+    "  decision: KEEP\n"
+    "- keyword: keyword2\n"
+    "  reason:: Reason for removing keyword2\n"
+    "  decision: REMOVE\n"
+)
+
+LLM_RESPONSE = """
 - keyword: keyword1
   reason: Reason for keeping keyword1
   decision: KEEP
@@ -48,9 +58,8 @@ class ModelsTest(unittest.TestCase):
             ),
         ),
     ])
-    expected_fragment = EXPECTED_RESPONSE
     self.assertEqual(
-        models.format_scoring_fragment(evaluations), expected_fragment
+        models.format_scoring_fragment(evaluations), EXPECTED_FRAGMENT
     )
 
   def test_parse_scoring_response(self):
@@ -67,7 +76,7 @@ class ModelsTest(unittest.TestCase):
         ),
     ]
     self.assertEqual(
-        models.parse_scoring_response(EXPECTED_RESPONSE),
+        models.parse_scoring_response(LLM_RESPONSE),
         expected_evaluations,
     )
 

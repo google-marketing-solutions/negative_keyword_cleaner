@@ -140,7 +140,6 @@ class Keyword:
 
 class KeywordHelper:
   def __init__(self, config: Config):
-    config = Config
     # Expand the mcc account to child accounts to initialize the report fetcher
     googleads_api_client = GoogleAdsApiClient(
         config_dict={
@@ -153,13 +152,10 @@ class KeywordHelper:
         },
         version=_GOOGLE_ADS_API_VERSION,
     )
-    try:
-      customer_ids = get_customer_ids(
-          googleads_api_client, config.login_customer_id
-      )
-      self.report_fetcher = AdsReportFetcher(googleads_api_client, customer_ids)
-    except exceptions.InternalServerError as e:
-      return None
+    customer_ids = get_customer_ids(
+        googleads_api_client, config.login_customer_id
+    )
+    self.report_fetcher = AdsReportFetcher(googleads_api_client, customer_ids)
 
   def get_customers(self, customer_ids: list[str]) -> GaarfReport:
     """Loads customer data for a given list of IDs.
