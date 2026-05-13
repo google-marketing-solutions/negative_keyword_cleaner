@@ -90,7 +90,6 @@ def get_access_token():
 
 
 def get_credentials(config: Dict[str, Any]):
-  creds = None
   user_info = {
       "client_id": config["client_id"],
       "refresh_token": config["refresh_token"],
@@ -103,10 +102,11 @@ def get_credentials(config: Dict[str, Any]):
     try:
       creds.refresh(Request())
     except Exception as error:
-      if "invalid_scope" in error.args[0]:
-        creds = None
+      if error.args and "invalid_scope" in error.args[0]:
+        return None
+      raise
 
-  if not creds.valid:
-    creds = None
+  if creds is None or not creds.valid:
+    return None
 
   return creds

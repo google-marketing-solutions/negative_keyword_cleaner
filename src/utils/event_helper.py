@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Module containing helper functions for managing session state and events."""
+
 import json
 import logging
 import pathlib
@@ -28,7 +31,7 @@ EVALUATIONS_FILE = (
 ).absolute()
 
 
-class session_state_manager:
+class session_state_manager:  # pylint: disable=invalid-name
   """Manages the application's session state using Streamlit's session state.
 
      This class provides a singleton implementation to manage state variables
@@ -66,7 +69,7 @@ class session_state_manager:
       batch_size = self.get("config").batch_size or 15
       self.set("batch_size", batch_size)
     if "evaluations" not in self.list_keys():
-        self.set("evaluations", self.load_evaluations_from_disk())
+      self.set("evaluations", self.load_evaluations_from_disk())
 
   def initialize(self, key, default_value):
     """Initialize a session state variable if it does not exist."""
@@ -103,12 +106,12 @@ class session_state_manager:
   def load_evaluations_from_disk(self):
     """Loads evaluations from a JSON file."""
     if EVALUATIONS_FILE.exists():
-        with open(EVALUATIONS_FILE, "r") as f:
-            evals_data = json.load(f)
-            return OrderedDict(
-                (k, models.KeywordEvaluation(**v))
-                for k, v in evals_data.items()
-            )
+      with open(EVALUATIONS_FILE, "r", encoding="utf-8") as f:
+        evals_data = json.load(f)
+        return OrderedDict(
+            (k, models.KeywordEvaluation(**v))
+            for k, v in evals_data.items()
+        )
     return OrderedDict()
 
   def save_evaluations_to_disk(self):
@@ -117,8 +120,8 @@ class session_state_manager:
     evals_data = {
         k: v.__dict__ for k, v in evaluations.items()
     }
-    with open(EVALUATIONS_FILE, "w") as f:
-        json.dump(evals_data, f)
+    with open(EVALUATIONS_FILE, "w", encoding="utf-8") as f:
+      json.dump(evals_data, f)
 
 
 state_manager = session_state_manager()
@@ -212,18 +215,20 @@ def handle_sample_batch() -> None:
 
 
 def reset_evaluations() -> None:
-  """
-  Reset the evaluations in the session state by initializing it to an empty OrderedDict.
-  This is used to clear any existing evaluations stored in the session state.
+  """Reset the evaluations in the session state.
+
+  Initializes it to an empty OrderedDict. This is used to clear any existing
+  evaluations stored in the session state.
   """
   state_manager.set("evaluations", OrderedDict())
   state_manager.save_evaluations_to_disk()
 
 
 def reset_eval_pairs() -> None:
-  """
-  Reset the eval_pairs in the session state by initializing it to an empty OrderedDict.
-  This is used to clear any existing eval_pairs stored in the session state.
+  """Reset the eval_pairs in the session state.
+
+  Initializes it to an empty OrderedDict. This is used to clear any existing
+  eval_pairs stored in the session state.
   """
   state_manager.set("eval_pairs", list())
 
@@ -232,10 +237,10 @@ def _save_human_eval(
     human_eval: models.KeywordEvaluation,
     llm_eval: models.KeywordEvaluation,
 ) -> None:
-  """
-  Save the human evaluation alongside the corresponding LLM evaluation.
-  Updates the evaluations dictionary and the scored set with the human evaluation,
-  and appends the evaluation pair to the eval_pairs list.
+  """Save the human evaluation alongside the corresponding LLM evaluation.
+
+  Updates the evaluations dictionary and the scored set with the human
+  evaluation, and appends the evaluation pair to the eval_pairs list.
 
   Parameters:
   human_eval (models.KeywordEvaluation): The human evaluation.
@@ -263,13 +268,15 @@ def define_handler_scoring(
     llm_eval: models.KeywordEvaluation,
     human_agree_with_llm: bool,
 ):
-  """
-  Define a handler for scoring, which returns an inner function to handle the logic
-  of saving human evaluations based on agreement with LLM evaluations.
+  """Define a handler for scoring.
+
+  Returns an inner function to handle the logic of saving human evaluations
+  based on agreement with LLM evaluations.
 
   Parameters:
   llm_eval (models.KeywordEvaluation): The LLM evaluation.
-  human_agree_with_llm (bool): Indicates if the human agrees with the LLM evaluation.
+  human_agree_with_llm (bool): Indicates if the human agrees with the LLM
+    evaluation.
 
   Returns:
   Callable: A function that handles the scoring logic.
@@ -318,9 +325,9 @@ def define_handler_save_human_eval(
     llm_eval: models.KeywordEvaluation,
     keyword_feedback_eval: models.KeywordEvaluation,
 ) -> Callable:
-  """
-  Define a handler for saving human evaluations, which returns an inner function to handle
-  the logic of saving human evaluations.
+  """Define a handler for saving human evaluations.
+
+  Returns an inner function to handle the logic of saving human evaluations.
 
   Parameters:
   llm_eval (models.KeywordEvaluation): The LLM (Language Model) evaluation.
@@ -340,13 +347,12 @@ def define_handler_save_human_eval(
   return _inner
 
 
-def handler_human_decision(event: Any, value: Any) -> None:
-  """
-  Handler for setting the human decision in the evaluation.
+def handler_human_decision(event: Any, value: Any) -> None:  # pylint: disable=unused-argument
+  """Handler for setting the human decision in the evaluation.
 
-  Parameters:
-  event: The event triggered by the UI component.
-  value: The value from the UI component.
+  Args:
+    event: The event triggered by the UI component.
+    value: The value from the UI component.
   """
   kf_eval = state_manager.get("keyword_feedback_eval")
   kf_eval.decision = value.props.value

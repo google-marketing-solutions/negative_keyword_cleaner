@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Module containing helper functions for loading and processing data."""
+
+from google.api_core import exceptions
 import pandas as pd
 import streamlit as st
 
@@ -30,13 +33,14 @@ def load_keywords(selected_customers: list) -> pd.DataFrame:
   selected_customers (list): A list of selected customer identifiers.
 
   Returns:
-  pd.DataFrame: A DataFrame containing the negative keywords along with additional information.
+  pd.DataFrame: A DataFrame containing the negative keywords along with
+    additional information.
   """
-  kw_helper = KeywordHelper(st.session_state.config)
-
-  if not kw_helper:
-    st.error("An internal error occurred. Could not load KeywordHelper.")
-    return
+  try:
+    kw_helper = KeywordHelper(st.session_state.config)
+  except exceptions.GoogleAPIError as e:
+    st.error(f"Could not initialize the Google Ads client: {e}")
+    st.stop()
 
   with st.spinner(
       text="Loading negative keywords... This may take a few minutes"
@@ -51,36 +55,36 @@ def load_keywords(selected_customers: list) -> pd.DataFrame:
         clean_selected_customers
     )
     if positive_kws_report:
-        positive_kws = kw_helper.clean_and_dedup(positive_kws_report)
-        positive_keyword_data = []
-        for keywords in positive_kws.values():
-          for kw in keywords:
-            positive_keyword_data.append((
-                kw.get_clean_keyword_text(),
-                kw.kw_text,
-                kw.match_type,
-                kw.campaign_name,
-                kw.campaign_id,
-                kw.adgroup_id,
-                kw.adgroup_name,
-                kw.account_id,
-                kw.account_name,
-            ))
-        positive_keyword_list = pd.DataFrame(
-            positive_keyword_data,
-            columns=[
-                "keyword",
-                "original_keyword",
-                "match_type",
-                "campaign_name",
-                "campaign_id",
-                "adgroup_id",
-                "adgroup_name",
-                "account_id",
-                "account_name",
-            ],
-        )
-        st.session_state["positive_keywords"] = positive_keyword_list
+      positive_kws = kw_helper.clean_and_dedup(positive_kws_report)
+      positive_keyword_data = []
+      for keywords in positive_kws.values():
+        for kw in keywords:
+          positive_keyword_data.append((
+              kw.get_clean_keyword_text(),
+              kw.kw_text,
+              kw.match_type,
+              kw.campaign_name,
+              kw.campaign_id,
+              kw.adgroup_id,
+              kw.adgroup_name,
+              kw.account_id,
+              kw.account_name,
+          ))
+      positive_keyword_list = pd.DataFrame(
+          positive_keyword_data,
+          columns=[
+              "keyword",
+              "original_keyword",
+              "match_type",
+              "campaign_name",
+              "campaign_id",
+              "adgroup_id",
+              "adgroup_name",
+              "account_id",
+              "account_name",
+          ],
+      )
+      st.session_state["positive_keywords"] = positive_keyword_list
 
   negative_kws = kw_helper.clean_and_dedup(negative_kws_report)
   negative_keyword_list = pd.DataFrame(
@@ -124,10 +128,11 @@ def load_customers(customer_ids: list[str]) -> pd.DataFrame:
   Returns:
     A pandas DataFrame containing the customer data.
   """
-  kw_helper = KeywordHelper(st.session_state.config)
-  if not kw_helper:
-    st.error("An internal error occurred. Could not load KeywordHelper.")
-    return
+  try:
+    kw_helper = KeywordHelper(st.session_state.config)
+  except exceptions.GoogleAPIError as e:
+    st.error(f"Could not initialize the Google Ads client: {e}")
+    st.stop()
 
   with st.spinner(text="Loading customers under MCC, please wait..."):
     customers_report = kw_helper.get_customers(customer_ids)

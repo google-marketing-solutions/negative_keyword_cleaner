@@ -120,7 +120,7 @@ resource "google_cloud_run_v2_service" "default" {
 
   template {
     containers {
-      image = "gcr.io/${var.project_id}/negatives:v1"
+      image = "us-central1-docker.pkg.dev/${var.project_id}/negatives/negatives:v1"
 
       env {
         name  = "port"
