@@ -23,8 +23,6 @@ variable "google_ads_api_token" {
   description = "The developer token from Google Ads"
 }
 
-variable "openai_api_key" {
-  description = "The API Key from OpenAI (optional)"
-}
+
 
 

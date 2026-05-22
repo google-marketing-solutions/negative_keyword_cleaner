@@ -15,24 +15,26 @@
 
 """Module containing data models and helper functions for the frontend."""
 
+from collections import OrderedDict
 import dataclasses
 import enum
 import logging
 import random
 import textwrap
-from collections import OrderedDict
-from typing import Optional, Any, Dict, List
+from typing import Any, Dict, List, Optional
 
+from bs4 import BeautifulSoup
+from langchain_core.documents import Document
+from langchain_core.language_models import BaseLanguageModel
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import PromptTemplate
+from langchain_text_splitters import CharacterTextSplitter
 import pandas as pd
+from pydantic import BaseModel
+from pydantic import Field
 import requests
 import streamlit as st
 import yaml
-from bs4 import BeautifulSoup
-from langchain.chains import summarize
-from langchain.docstore.document import Document
-from langchain.llms.base import LLM
-from langchain.prompts import PromptTemplate
-from langchain.text_splitter import CharacterTextSplitter
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +88,8 @@ def fetch_landing_page_text(url: str) -> List[Document]:
   url (str): The URL of the landing page.
 
   Returns:
-  List[Document]: A list of Documents containing the text from the landing page.
+  List[Document]: A list of Documents containing the text from the
+  landing page.
   """
   headers = {
       "User-Agent": (
@@ -118,14 +121,12 @@ def fetch_landing_page_text(url: str) -> List[Document]:
   return text_splitter.create_documents([content])
 
 
-def summarize_text(docs: list[Document], llm: LLM, verbose: bool = False) -> (
-    str):
+def summarize_text(docs: list[Document], llm: BaseLanguageModel) -> str:
   """Summarizes the given text using LangChain's summary chain.
 
   Args:
     docs (Document): Documents to summarize.
-    llm (LLM): Language model to use for summarization.
-    verbose (bool): If True, enables verbose mode.
+    llm (BaseLanguageModel): Language model to use for summarization.
 
   Returns:
     str: The summarized text.
@@ -133,10 +134,9 @@ def summarize_text(docs: list[Document], llm: LLM, verbose: bool = False) -> (
   prompt = PromptTemplate(
       template=_SUMMARY_PROMPT_TEMPLATE, input_variables=["text"]
   )
-  chain = summarize.load_summarize_chain(
-      llm, chain_type="map_reduce", map_prompt=prompt, verbose=verbose
-  )
-  return chain.run(docs)
+  text = "\n\n".join([doc.page_content for doc in docs])
+  chain = prompt | llm | StrOutputParser()
+  return chain.invoke({"text": text})
 
 
 class ScoreDecision(enum.StrEnum):
@@ -154,7 +154,7 @@ class ScoreDecision(enum.StrEnum):
 
 
 def asdict_enum_factory(data: Dict[str, Any]) -> Dict[str, Any]:
-  """Factory function to create a custom serialization function for dataclasses.
+  """Factory function to create custom serialization for dataclasses.
 
   This function handles enum members by converting them to their respective
   values.
@@ -229,14 +229,23 @@ class EvaluationPair:
   human_decision: ScoreDecision
 
 
+class KeywordEvaluationModel(BaseModel):
+  keyword: str = Field(description="The negative keyword analyzed")
+  reason: str = Field(description="Concise explanation of the decision")
+  decision: str = Field(description="KEEP or REMOVE")
+
+
+class KeywordEvaluations(BaseModel):
+  evaluations: List[KeywordEvaluationModel]
+
+
 def sample_batch(
     df: pd.DataFrame,
     batch_size: int,
     exclude_keywords: Optional[set[str]] = None,
     random_state: int = 0,
 ) -> pd.DataFrame:
-  """
-  Samples a batch of keywords from the provided DataFrame.
+  """Samples a batch of keywords from the provided DataFrame.
 
   Parameters:
   df (pd.DataFrame): The DataFrame to sample from.
@@ -260,8 +269,7 @@ def sample_batch(
 def format_scoring_fragment(
     evaluations: OrderedDict[str, KeywordEvaluation],
 ) -> str:
-  """
-  Formats the given evaluations for the LLM.
+  """Formats the given evaluations for the LLM.
 
   Parameters:
   evaluations (OrderedDict[str, KeywordEvaluation]): Evaluations to format.
@@ -332,7 +340,9 @@ def parse_scoring_response(response: str) -> List[KeywordEvaluation]:
         outputs.append(KeywordEvaluation.from_dict(item[0]))
     except (yaml.parser.ParserError, TypeError, ValueError) as e:
       logger.error(
-          "Failed to parse keyword: %s. Original Content: %s", e, item_yaml
+          "Failed to parse keyword: %s. Original Content: %s",
+          e,
+          item_yaml,
       )
 
   return outputs

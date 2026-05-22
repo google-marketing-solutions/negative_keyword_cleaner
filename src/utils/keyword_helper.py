@@ -33,7 +33,7 @@ from utils.gaarf_queries import CustomerNames
 from utils.gaarf_queries import KeywordLevel
 from utils.gaarf_queries import PositiveKeywords
 
-_GOOGLE_ADS_API_VERSION = "v20"
+_GOOGLE_ADS_API_VERSION = "v24"
 
 
 class MatchType(Enum):
@@ -63,7 +63,7 @@ def get_customer_ids(
 
   def fetch_customer_ids(query: str) -> Sequence[str]:
     """Fetches customer ids based on the provided query."""
-    report_fetcher = AdsReportFetcher(ads_client, customer_id)
+    report_fetcher = AdsReportFetcher(ads_client, customer_ids=customer_id)
     result = report_fetcher.fetch(QuerySpecification(query,
                                                      title="fetch_customer_ids")
                                   .generate(),
@@ -153,14 +153,16 @@ class KeywordHelper:
             "use_proto_plus": config.use_proto_plus,
             "client_id": auth._OAUTH_CLIENT_ID,
             "client_secret": auth._OAUTH_CLIENT_SECRET,
-            "refresh_token": auth.get_access_token(),
+            "refresh_token": auth.get_refresh_token(),
         },
         version=_GOOGLE_ADS_API_VERSION,
     )
     customer_ids = get_customer_ids(
         googleads_api_client, config.login_customer_id
     )
-    self.report_fetcher = AdsReportFetcher(googleads_api_client, customer_ids)
+    self.report_fetcher = AdsReportFetcher(
+        googleads_api_client, customer_ids=customer_ids
+    )
 
   def get_customers(self, customer_ids: list[str]) -> GaarfReport:
     """Loads customer data for a given list of IDs.

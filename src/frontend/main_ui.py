@@ -23,24 +23,20 @@ results.
 
 import json
 import logging
-import re
 import textwrap
-import time
-from typing import Callable
 
-import pandas as pd
-import requests
-import streamlit as st
-import yaml
-from langchain import prompts, chains
-from streamlit_elements import elements, mui
-
-import frontend.components.mui_components as mui_comp
 from frontend import models
 from frontend.components import sidebar
-from utils import auth, data_helper, event_helper
+from frontend.components.advertiser_info import handle_advertiser_information
+from frontend.components.keyword_selector import load_customers_and_campaigns
+from langchain_core.prompts import PromptTemplate
+import pandas as pd
+import streamlit as st
+from utils import auth
+from utils import event_helper
 from utils import llm_helper
 from utils.event_helper import session_state_manager
+import yaml
 
 logging.getLogger().setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -48,21 +44,6 @@ logger = logging.getLogger(__name__)
 _SCHEMA_EVALUATIONS = {}
 
 _DEBUG_SCORING_LIMIT = -1  # No limit: -1
-
-_URL_REGEX = (
-    r"^((http|https)://)[-a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\."
-    r"[a-z]{2,6}\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)$"
-)
-
-
-def _set_manual_context(
-    state_manager: session_state_manager,
-) -> Callable[[], None]:
-  def _set_manual_context_callback():
-    state_manager.set("manual_context", True)
-    pass
-
-  return _set_manual_context_callback
 
 
 def display_page(state_manager: session_state_manager) -> None:
@@ -96,306 +77,18 @@ def display_page(state_manager: session_state_manager) -> None:
   llm = llm_helper.select_llm(state_manager.get("config"))
 
   # Call helper functions
-  _handle_advertiser_information(state_manager, llm)
-  _load_customers_and_campaigns(state_manager)
+  handle_advertiser_information(state_manager, llm)
+  load_customers_and_campaigns(state_manager)
   _sample_and_score_keywords(state_manager)
   _score_remaining_keywords(state_manager)
   _download_results(state_manager)
-
-
-def _handle_advertiser_information(state_manager, llm):
-  """Handles the advertiser's information input and processes it.
-
-  Args:
-    state_manager (session_state_manager): An object managing the session
-    state of the application.
-    llm: The language model used.
-
-  Returns:
-    None
-  """
-  with st.expander(
-      "1. Advertiser Information",
-      expanded=state_manager.get("context_open", True),
-  ):
-    company_homepage_url = st.text_input(
-        "Company Homepage URL",
-        placeholder="https://...",
-        key="company_homepage_url",
-        value=state_manager.get("company_homepage_url", ""),
-        disabled=st.session_state.get("manual_context", False),
-    )
-    _process_company_homepage(company_homepage_url, state_manager, llm)
-    _get_company_and_exclude_pitches(state_manager)
-
-  _handle_context_ready(state_manager)
-
-
-def _process_company_homepage(company_homepage_url, state_manager, llm):
-  """Processes the company's homepage URL to gather its text.
-
-  Args:
-    company_homepage_url (str): The URL of the company's homepage to be
-    processed.
-    state_manager (session_state_manager): An Object that manages the
-    application's session state
-    llm: The language model used.
-
-  Returns:
-      None
-  """
-  if not company_homepage_url and not state_manager.get("manual_context"):
-    st.info(
-        "Once I have their website URL, I can directly read and "
-        "understand who this customer is.",
-        icon="🧑‍🎓",
-    )
-    st.write("If you want to give me advertiser information directly")
-    st.button(
-        "Add context manually",
-        on_click=_set_manual_context(state_manager),
-    )
-    st.stop()
-
-  if company_homepage_url and not state_manager.get("manual_context"):
-    if not re.match(_URL_REGEX, company_homepage_url):
-      st.error(
-          "The URL is not in a valid format. Please check it and try again."
-      )
-      st.stop()
-    else:
-      try:
-        with st.spinner("I'm browsing their website..."):
-          homepage_docs = models.fetch_landing_page_text(company_homepage_url)
-          state_manager.set("homepage_fetched", True)
-        st.success("Browsing done, I've collected enough info", icon="🧑‍🎓")
-
-        with st.spinner(
-            "I'm now consolidating everything into an executive summary "
-            "(this will take a minute) ..."
-        ):
-          if not state_manager.get("homepage_summary", None):
-            homepage_summary = models.summarize_text(
-                homepage_docs, llm, verbose=True
-            ).strip()
-            state_manager.set("homepage_summary", homepage_summary)
-          st.success(
-              "Summarizing done but feel free to correct anything that I've "
-              "written.",
-              icon="🎓",
-          )
-      except requests.exceptions.RequestException as e:
-        st.error(f"Could not crawl the website: {e}")
-        if st.button("Add context manually"):
-          state_manager.set("manual_context", True)
-          st.rerun()
-        st.stop()
-
-
-def _get_company_and_exclude_pitches(state_manager):
-  """Displays the company's executive summaries.
-
-  This method displays (positive prompt) and exclusion criteria (negative
-  prompt) from the user input.
-
-  Args:
-    state_manager (session_state_manager): An Object that Manages the
-    session state of the application.
-
-  Returns:
-    tuple: A tuple containing:
-      - company_pitch (str): The executive summary provided by the user.
-      - exclude_pitch (str): The exclusion criteria provided by the user.
-  """
-
-  homepage_summary = state_manager.get("homepage_summary", "")
-  company_pitch = st.text_area(
-      "✅ [Positive prompt] Advertiser's executive summary",
-      help="You can add campaign information below",
-      placeholder="Describe what the company is selling in a few words",
-      value=homepage_summary,
-      height=150,
-  )
-
-  st.info(
-      "Happy to know more about what you don't want to target ads for",
-      icon="🧑‍🎓",
-  )
-
-  exclude_pitch = st.text_area(
-      "❌ [Negative prompt] Exclude summary",
-      placeholder=(
-          "Describe what you don't want to target ads for (your brand,"
-          " competitor's names, other non-relevant topics ...)"
-      ),
-      height=50,
-  )
-
-  return company_pitch, exclude_pitch
-
-
-def _handle_context_ready(state_manager):
-  if not state_manager.get("context_ready"):
-    st.button(
-        "Continue with this context",
-        on_click=event_helper.handle_continue_with_context,
-    )
-    st.stop()
-  elif state_manager.get("context_open"):
-    state_manager.set("context_open", False)
-    st.rerun()
-
-
-def _load_customers_and_campaigns(state_manager):
-  _load_customers(state_manager)
-  _load_negative_keywords(state_manager)
-  _filter_campaigns(state_manager)
-  _handle_filters_ready(state_manager)
-
-
-def _load_customers(state_manager):
-  """Loads and displays a list of customers for user selection.
-
-  Args:
-    state_manager (session_state_manager): An object that manages the session
-    state of the application.
-
-  Returns:
-    None
-  """
-  with st.expander(
-      "2. Load Customers",
-      expanded=state_manager.get("load_customers_open", True),
-  ):
-    df = data_helper.load_customers(st.session_state.config.login_customer_id)
-    st.multiselect(
-        "Selected Customers",
-        df["customer_id"].apply(_format_customer_id)
-        + " | "
-        + df["customer_name"].astype(str),
-        [],
-        on_change=event_helper.handle_selected_customers,
-        key="selected_customers",
-    )
-
-    if not state_manager.get("customers_ready", False):
-      st.button(
-          "Continue with these customers",
-          on_click=event_helper.handle_continue_with_customers,
-      )
-      st.stop()
-
-
-def _load_negative_keywords(state_manager):
-  """Loads and displays negative keywords associated with the customers.
-
-  Args:
-    state_manager (session_state_manager): An Object that manages the
-      session state of the application.
-
-  Returns:
-    None
-  """
-  with st.expander(
-      "3. Load negative keywords",
-      expanded=state_manager.get("load_keywords_open", True),
-  ):
-    selected_customers = state_manager.get("selected_customers", [])
-    df = data_helper.load_keywords(selected_customers).query('keyword != ""')
-    state_manager.set("df_keywords", df)
-    number_of_neg_kw = f"{len(df):.0f}"
-    st.success(
-        f"I've loaded {number_of_neg_kw} negative keywords from all"
-        " campaigns. Filter only the relevant campaigns!",
-        icon="🎓",
-    )
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric(
-        "Total negative keywords",
-        f"{len(df):.0f}".replace(",", " "),
-    )
-    col2.metric(
-        "Total unique keywords",
-        f"{df.keyword.nunique():.0f}".replace(",", " "),
-    )
-    col3.metric(
-        "Total campaigns",
-        f"{df.campaign_id.nunique():.0f}".replace(",", " "),
-    )
-
-
-def _filter_campaigns(state_manager):
-  """Filters negative keywords based on selected campaigns.
-
-  Args:
-    state_manager (session_state_manager): An Object that manages the
-      session state of the application.
-
-  Returns:
-    None
-  """
-
-  df = state_manager.get("df_keywords", pd.DataFrame())
-  with st.expander(
-      "4. Filter on campaigns",
-      expanded=state_manager.get("filter_campaigns_open", True),
-  ):
-    st.multiselect(
-        "Selected Campaigns",
-        df.groupby(["campaign_name"])["keyword"]
-        .count()
-        .reset_index(name="count")
-        .sort_values(["count"], ascending=True),
-        [],
-        on_change=event_helper.handle_selected_campaigns,
-        key="selected_campaigns",
-    )
-
-    filtered_keywords = df.copy()
-    if state_manager.get("selected_campaigns", None):
-      selected_campaigns = state_manager.get("selected_campaigns")
-      campaigns_filter = filtered_keywords["campaign_name"].isin(
-          selected_campaigns
-      )
-      filtered_keywords = filtered_keywords[campaigns_filter]
-      state_manager.set("filtered_keywords", filtered_keywords)
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric(
-        "Selected negative keywords",
-        f"{len(filtered_keywords):.0f}".replace(",", " "),
-    )
-    col2.metric(
-        "Selected Unique keywords",
-        f"{filtered_keywords.keyword.nunique():.0f}".replace(",", " "),
-    )
-    col3.metric(
-        "Selected campaigns",
-        f"{filtered_keywords.campaign_id.nunique():.0f}".replace(",", " "),
-    )
-
-
-def _handle_filters_ready(state_manager):
-  if not state_manager.get("filters_ready", False):
-    st.button(
-        "Continue with these filters",
-        on_click=event_helper.handle_continue_with_filters,
-    )
-    st.stop()
-
-  if state_manager.get("load_keywords_open"):
-    state_manager.set("load_keywords_open", False)
-    time.sleep(0.05)
-    st.rerun()
 
 
 def _display_batch_accuracy(state_manager):
   """Calculates and displays the accuracy of evaluations.
 
   Args:
-    state_manager: The session state manager that holds the application's
-      state.
+    state_manager: The session state manager that holds the application's state.
   """
   # Retrieve epoch evaluation pairs from state_manager
   epoch_eval_pairs = state_manager.get("epoch_eval_pairs", [])
@@ -523,9 +216,12 @@ def _score_keywords(state_manager):
       )
       prompt = _create_prompt()
       scoring_llm = llm_helper.select_llm(state_manager.get("config"))
-      llm_chain = chains.LLMChain(prompt=prompt, llm=scoring_llm, verbose=True)
-      llm_scored_keywords_raw = llm_chain.run({
-          "company_segment": "\n\n".join(
+      structured_llm = scoring_llm.with_structured_output(
+          models.KeywordEvaluations
+      )
+
+      prompt_val = prompt.format(
+          company_segment="\n\n".join(
               filter(
                   None,
                   [
@@ -534,12 +230,21 @@ def _score_keywords(state_manager):
                   ],
               )
           ),
-          "facts_segment": formatted_facts,
-          "keywords_segment": formatted_keywords,
-      })
-      llm_scored_keywords = models.parse_scoring_response(
-          llm_scored_keywords_raw
+          facts_segment=formatted_facts,
+          keywords_segment=formatted_keywords,
       )
+
+      llm_response = structured_llm.invoke(prompt_val)
+
+      llm_scored_keywords = []
+      for item in llm_response.evaluations:
+        llm_scored_keywords.append(
+            models.KeywordEvaluation(
+                keyword=item.keyword,
+                decision=models.ScoreDecision(item.decision),
+                reason=item.reason,
+            )
+        )
     else:
       llm_scored_keywords = []
 
@@ -551,12 +256,6 @@ def _create_prompt():
   template = textwrap.dedent("""\
             You are a machine learning model that analyzes negative keywords for Google Ads campaigns. For each provided negative keyword, determine if it should be KEPT (to prevent ads from showing for that search term) or REMOVED (to allow ads to show for searches containing that term).
 
-            Provide your analysis in the following YAML format for each keyword:
-
-            - keyword: <THE_NEGATIVE_KEYWORD>
-              reason: <CONCISE_EXPLANATION_OF_THE_DECISION>
-              decision: <KEEP or REMOVE>
-
             The 'reason' field should be a well-reasoned explanation based on these factors:
 
             1. Relevance: Is the keyword closely related to the advertised products/services?
@@ -565,7 +264,6 @@ def _create_prompt():
             4. Campaign Objectives: Does the keyword align with the overall campaign goals?
 
             Do not use any quotes (' or ") in the 'reason' field nor mention the initial keyword.
-            Your output should strictly follow the specified YAML format, with no additional text.
 
             KEEP means: Keep this keyword in the Negative Keyword list to prevent ads from showing for that search term.
             REMOVE means: Remove this keyword from the Negative Keyword list to allow ads to show for searches containing that term.
@@ -579,7 +277,7 @@ def _create_prompt():
             Analyze the following keywords:
             {keywords_segment}
             """)
-  prompt = prompts.PromptTemplate(
+  prompt = PromptTemplate(
       template=template,
       input_variables=[
           "company_segment",
@@ -611,10 +309,79 @@ def _display_scored_keywords(state_manager):
   _split_and_display_keywords(state_manager)
 
 
+def _render_standard_card(
+    item: models.KeywordEvaluation,
+    df_keywords: pd.DataFrame,
+    state_manager,
+):
+  """Renders a standard Streamlit card for a keyword evaluation."""
+  kw_lines = df_keywords.loc[df_keywords.keyword == item.keyword]
+  kw_campaigns = kw_lines.campaign_name.tolist()
+
+  with st.container(border=True):
+    st.markdown(f"### 🏷️ {item.keyword}")
+    st.markdown(f"📌 **Campaigns:** {', '.join(kw_campaigns)}")
+    st.markdown(f"🤖 **AI Reason:** _{item.reason or 'Empty'}_")
+    st.divider()
+
+    keyword_feedback_eval = state_manager.get("keyword_feedback_eval", None)
+
+    if keyword_feedback_eval and keyword_feedback_eval.keyword == item.keyword:
+      new_reason = st.text_input(
+          "Explain your rating:",
+          value=keyword_feedback_eval.reason,
+          key=f"reason_{item.keyword}",
+      )
+
+      decision_options = [
+          d.value
+          for d in models.ScoreDecision
+          if d != models.ScoreDecision.UNKNOWN
+      ]
+      current_index = (
+          decision_options.index(keyword_feedback_eval.decision.value)
+          if keyword_feedback_eval.decision.value in decision_options
+          else 0
+      )
+
+      new_decision_str = st.selectbox(
+          "Decision",
+          options=decision_options,
+          index=current_index,
+          key=f"decision_{item.keyword}",
+      )
+
+      keyword_feedback_eval.reason = new_reason
+      keyword_feedback_eval.decision = models.ScoreDecision(new_decision_str)
+
+      c1, c2, _ = st.columns([1, 1, 2])
+      with c1:
+        if st.button("💾 Save", key=f"save_{item.keyword}"):
+          event_helper.define_handler_save_human_eval(
+              llm_eval=item,
+              keyword_feedback_eval=keyword_feedback_eval,
+          )()
+      with c2:
+        if st.button("🚫 Cancel", key=f"cancel_{item.keyword}"):
+          event_helper.handler_cancel_human_eval()()
+    else:
+      c1, c2, _ = st.columns([1, 1, 2])
+      with c1:
+        if st.button("✅ Agree", key=f"agree_{item.keyword}"):
+          event_helper.define_handler_scoring(
+              llm_eval=item, human_agree_with_llm=True
+          )()
+      with c2:
+        if st.button("❌ Disagree", key=f"disagree_{item.keyword}"):
+          event_helper.define_handler_scoring(
+              llm_eval=item, human_agree_with_llm=False
+          )()
+
+
 def _split_and_display_keywords(state_manager):
   # Retrieve necessary data from state_manager
   parsed_scored_keywords = state_manager.get("parsed_scored_keywords", [])
-  keywords = state_manager.get("sampled_keywords")
+  keywords = state_manager.get("filtered_keywords")
   scored_set = state_manager.get("scored_set", set())
 
   # Initialize lists to categorize keywords
@@ -635,44 +402,21 @@ def _split_and_display_keywords(state_manager):
       keywords_unknown.append(item)
 
   # Track keyword feedback if a user disagrees
-  keyword_feedback_eval = state_manager.get("keyword_feedback_eval", None)
   if keywords_to_remove or keywords_to_keep:
-    with elements("cards"):
-      with mui.Grid(container=True):
-        # Display keywords the LLM suggests to target (REMOVE from negatives)
-        with mui.Grid(item=True, xs=True):
-          mui.Typography(
-              f"I think you should target ({len(keywords_to_remove)}):",
-              variant="h5",
-              sx={"mb": 2},
-          )
-          with mui.Stack(spacing=2, direction="column", useFlexGap=True):
-            if not keywords_to_remove:
-              mui.Typography("No more.")
-            for item in keywords_to_remove:
-              mui_comp.render_item_card(
-                  item,
-                  keyword_feedback_eval=keyword_feedback_eval,
-                  df_keywords=keywords,
-              )
-        # Divider between the two categories
-        mui.Divider(orientation="vertical", flexItem=True, sx={"mx": 4})
-        # Display keywords the LLM suggests to keep as negatives
-        with mui.Grid(item=True, xs=True):
-          mui.Typography(
-              f"I think you shouldn't target ({len(keywords_to_keep)}):",
-              variant="h5",
-              sx={"mb": 2},
-          )
-          with mui.Stack(spacing=2, direction="column", useFlexGap=True):
-            if not keywords_to_keep:
-              mui.Typography("No more.")
-            for item in keywords_to_keep:
-              mui_comp.render_item_card(
-                  item,
-                  keyword_feedback_eval=keyword_feedback_eval,
-                  df_keywords=keywords,
-              )
+    col1, col2 = st.columns(2)
+    with col1:
+      st.subheader(f"I think you should target ({len(keywords_to_remove)}):")
+      if not keywords_to_remove:
+        st.write("No more.")
+      for item in keywords_to_remove:
+        _render_standard_card(item, keywords, state_manager)
+
+    with col2:
+      st.subheader(f"I think you shouldn't target ({len(keywords_to_keep)}):")
+      if not keywords_to_keep:
+        st.write("No more.")
+      for item in keywords_to_keep:
+        _render_standard_card(item, keywords, state_manager)
   else:
     # If no keywords to display, proceed to score batch evaluations
     event_helper.score_batch_evals()
@@ -756,9 +500,11 @@ def _process_remaining_keywords(state_manager):
     )
     prompt = _create_prompt()
     scoring_llm = llm_helper.select_llm(state_manager.get("config"))
-    llm_chain = chains.LLMChain(prompt=prompt, llm=scoring_llm, verbose=True)
+    chain = prompt | scoring_llm.with_structured_output(
+        models.KeywordEvaluations
+    )
 
-    latest_scored_keywords_raw = llm_chain.run({
+    scored_keywords_obj = chain.invoke({
         "company_segment": "\n\n".join(
             filter(
                 None,
@@ -772,12 +518,17 @@ def _process_remaining_keywords(state_manager):
         "keywords_segment": formatted_keywords,
     })
 
-    try:
-      llm_scored_keywords = models.parse_scoring_response(
-          latest_scored_keywords_raw
-      )
-    except yaml.scanner.ScannerError:
+    if not scored_keywords_obj:
       continue
+
+    llm_scored_keywords = [
+        models.KeywordEvaluation(
+            keyword=item.keyword,
+            decision=models.ScoreDecision(item.decision.upper()),
+            reason=item.reason,
+        )
+        for item in scored_keywords_obj.evaluations
+    ]
 
     all_scored_keywords = pre_scored_keywords + llm_scored_keywords
     scoring_kws_evals.extend(all_scored_keywords)
@@ -800,19 +551,6 @@ def _download_results(state_manager):
   _display_consolidated_download()
 
 
-def _format_customer_id(cid: int) -> str:
-  """Format the customer ID into a more readable string format.
-
-  Args:
-    cid (int): The customer ID to be formatted.
-
-  Returns:
-    str: The formatted customer ID.
-  """
-  str_cid = str(cid)
-  return f"{str_cid[:3]}-{str_cid[3:6]}-{str_cid[6:]}"
-
-
 def _prepare_and_display_downloads(state_manager):
   cached_scoring_kws_evals = state_manager.get("scoring_kws_evals")
   filtered_keywords = state_manager.get("filtered_keywords")
@@ -823,9 +561,22 @@ def _prepare_and_display_downloads(state_manager):
   )
   st.session_state["df_to_remove_student"] = df_to_remove
 
-  # Display DataFrames and download buttons
+  # Filter for Campaign/AdGroup negatives
+  df_campaign_adgroup = df_to_remove[df_to_remove["campaign_id"].ne("")]
+
+  # Filter for Shared Lists negatives
+  df_shared_lists = df_to_remove[df_to_remove["campaign_id"].eq("")]
+
+  # Format Shared Lists for Editor
+  df_shared_lists_editor = df_shared_lists[
+      ["Campaign", "Keyword", "match_type"]
+  ].rename(
+      columns={"Campaign": "Negative Keyword List", "match_type": "Match Type"}
+  )
+
+  st.subheader("Campaign & AdGroup Level Negatives")
   st.dataframe(
-      df_to_remove,
+      df_campaign_adgroup,
       height=200,
       column_config={
           "campaign_id": st.column_config.TextColumn("campaign_id"),
@@ -834,10 +585,19 @@ def _prepare_and_display_downloads(state_manager):
       },
   )
   st.download_button(
-      "Download keywords to remove found by Student",
-      df_to_remove.to_csv(index=False),
+      "Download Campaign/AdGroup keywords to remove",
+      df_campaign_adgroup.to_csv(index=False),
       file_name="negative_keywords_to_remove.csv",
   )
+
+  if not df_shared_lists_editor.empty:
+    st.subheader("Shared Negative Keyword Lists")
+    st.dataframe(df_shared_lists_editor, height=200)
+    st.download_button(
+        "Download Shared Keyword Lists to remove (Editor format)",
+        df_shared_lists_editor.to_csv(index=False),
+        file_name="shared_negative_keywords_to_remove.csv",
+    )
   st.dataframe(
       df_to_keep,
       height=200,
@@ -873,20 +633,28 @@ def _prepare_human_dataframe(state_manager):
     formatted_evals = [
         {
             "keyword": kw,
-            "original_keyword": filtered_keywords.loc[
-                filtered_keywords["keyword"] == kw, "original_keyword"
-            ].values[0],
+            "original_keyword": (
+                filtered_keywords.loc[
+                    filtered_keywords["keyword"] == kw, "original_keyword"
+                ].values[0]
+            ),
             "human_decision": str(human_eval.decision),
             "human_reason": human_eval.reason,
-            "campaign_name": filtered_keywords.loc[
-                filtered_keywords["keyword"] == kw, "campaign_name"
-            ].values[0],
-            "campaign_id": filtered_keywords.loc[
-                filtered_keywords["keyword"] == kw, "campaign_id"
-            ].values[0],
-            "adgroup_id": filtered_keywords.loc[
-                filtered_keywords["keyword"] == kw, "adgroup_id"
-            ].values[0],
+            "campaign_name": (
+                filtered_keywords.loc[
+                    filtered_keywords["keyword"] == kw, "campaign_name"
+                ].values[0]
+            ),
+            "campaign_id": (
+                filtered_keywords.loc[
+                    filtered_keywords["keyword"] == kw, "campaign_id"
+                ].values[0]
+            ),
+            "adgroup_id": (
+                filtered_keywords.loc[
+                    filtered_keywords["keyword"] == kw, "adgroup_id"
+                ].values[0]
+            ),
             "Source": "Human",
         }
         for kw, human_eval in evaluations.items()
@@ -944,17 +712,21 @@ def _prepare_dataframes(cached_scoring_kws_evals, filtered_keywords):
           "Ad Group": df_entry.adgroup_name,
           "Keyword": student_eval.keyword,
           "Criterion Type": (
-              "Negative " if df_entry.adgroup_name else "Campaign Negative "
-          ) + (
-              "Broad"
-              if df_entry.match_type == "BROAD"
-              else "Phrase"
-              if df_entry.match_type == "PHRASE"
-              else "Exact"
+              ("Negative " if df_entry.adgroup_name else "Campaign Negative ")
+              + (
+                  "Broad"
+                  if df_entry.match_type == "BROAD"
+                  else "Phrase"
+                  if df_entry.match_type == "PHRASE"
+                  else "Exact"
+              )
           ),
           "Status": "Removed",
           "Student Reason": student_eval.reason,
           "Source": "Student",
+          "campaign_id": df_entry.campaign_id,
+          "adgroup_id": df_entry.adgroup_id,
+          "match_type": df_entry.match_type,
       }
       for student_eval in cached_scoring_kws_evals
       if student_eval.decision == models.ScoreDecision.REMOVE
@@ -971,13 +743,14 @@ def _prepare_dataframes(cached_scoring_kws_evals, filtered_keywords):
           "Ad Group": df_entry.adgroup_name,
           "Keyword": student_eval.keyword,
           "Criterion Type": (
-              "Negative " if df_entry.adgroup_name else "Campaign Negative "
-          ) + (
-              "Broad"
-              if df_entry.match_type == "BROAD"
-              else "Phrase"
-              if df_entry.match_type == "PHRASE"
-              else "Exact"
+              ("Negative " if df_entry.adgroup_name else "Campaign Negative ")
+              + (
+                  "Broad"
+                  if df_entry.match_type == "BROAD"
+                  else "Phrase"
+                  if df_entry.match_type == "PHRASE"
+                  else "Exact"
+              )
           ),
           "Status": "Enabled",
           "Student Reason": student_eval.reason,

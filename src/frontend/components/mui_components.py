@@ -43,7 +43,7 @@ def render_item_card(
       "borderRadius": 3,
   }
   card_header_style = {"background": "rgba(250, 250, 250, 0.1)"}
-  with mui.Card(key="first_item", sx=card_style, elevation=1):
+  with mui.Card(key=item.keyword, sx=card_style, elevation=1):
     mui.CardHeader(
         title=item.keyword,
         titleTypographyProps={"variant": "h6"},

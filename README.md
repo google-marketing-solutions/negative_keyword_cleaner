@@ -65,7 +65,6 @@ use now, you may proceed with the steps below.
    echo 'google_oauth_client_secret = "..."' >> terraform/secrets.tfvars
    echo 'mcc_id = "XXXXXXXXXX"' >> terraform/secrets.tfvars
    echo 'google_ads_api_token = "..."' >> terraform/secrets.tfvars
-   echo 'open_ai_key = "..."' >> terraform/secrets.tfvars
    ```
    > You can edit the ```terraform/main.tf``` file under the
    google_iam_policy.noauth section, to restrict access to specific users (the
@@ -100,31 +99,25 @@ You can remove all GCP resources with one command:
 
 ## Run the app on a local machine
 
-Create a test client for local development:
+1. **Configure environment variables**: Create a `.env` file in the root directory with the following content (replace with your credentials):
+   ```env
+   OAUTH_CLIENT_ID=your_client_id
+   OAUTH_CLIENT_SECRET=your_client_secret
+   OAUTH_REDIRECT_URI=http://localhost:8080
+   MCC_ID=your_mcc_id
+   GOOGLE_ADS_API_TOKEN=your_dev_token
+   GOOGLE_API_KEY=your_gemini_api_key
+   ```
 
-    # Create the OAuth Client (from the Google Cloud Platform UI, cannot be done programmatically)
-    open https://console.cloud.google.com
+2. **Install and run**:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt --extra-index-url https://pypi.org/simple
+   streamlit run src/AI_student.py
+   ```
 
-    # Copy the OAuth2.0 Client Id and Client Secret in `.env`
-    echo "OAUTH_CLIENT_ID=xxx" > .env
-    echo "OAUTH_CLIENT_SECRET=yyy" >> .env
-    echo "OAUTH_REDIRECT_URI=http://localhost:8080" >> .env
-
-Using a standard virtualenv:
-
-    # (Optional) if you have pyenv
-    pyenv update
-    pyenv install 3.11.3
-    pyenv local 3.11.3
-
-    # Installs dependencies
-    python -m venv .venv
-    source .venv/bin/activate
-    (.venv) pip install -r requirements.txt
-    (.venv) pip install python-dotenv
-
-    # Runs the streamlit server
-    (.venv) streamlit run --server.headless=false src/AI_student.py
+*Note: This project requires Python 3.11. If you need to manage Python versions, consider using `pyenv`.*
 
 ## Disclaimer
 

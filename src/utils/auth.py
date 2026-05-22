@@ -85,8 +85,13 @@ def authenticate_user():
 
 
 def get_access_token():
-  oauth_result = st.session_state[oauth._STKEY]
+  oauth_result = st.session_state[oauth.STKEY]
   return oauth_result["access_token"]
+
+
+def get_refresh_token():
+  oauth_result = st.session_state[oauth.STKEY]
+  return oauth_result.get("refresh_token")
 
 
 def get_credentials(config: Dict[str, Any]):

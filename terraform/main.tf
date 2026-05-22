@@ -157,10 +157,7 @@ resource "google_cloud_run_v2_service" "default" {
         value = var.google_ads_api_token
       }
 
-      env {
-        name  = "OPENAI_API_KEY"
-        value = var.openai_api_key
-      }
+
       
       resources {
         limits = {

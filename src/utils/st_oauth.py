@@ -6,7 +6,7 @@ import jwt
 import requests
 import streamlit as st
 
-_STKEY = 'ST_OAUTH'
+STKEY = 'ST_OAUTH'
 _DEFAULT_SECKEY = 'oauth'
 
 
@@ -21,8 +21,8 @@ def jwks_client(jwks_uri):
 
 
 def logout():
-  if _STKEY in st.session_state:
-    del st.session_state[_STKEY]
+  if STKEY in st.session_state:
+    del st.session_state[STKEY]
 
 
 def string_num_generator(size):
@@ -51,6 +51,8 @@ def show_auth_link(config, label):
       'response_type': 'code',
       'state': state_parameter,
       'scope': config['scope'],
+      'access_type': 'offline',
+      'prompt': 'consent',
   })
   request_url = f"{config['authorization_endpoint']}?{query_params}"
   if len(st.query_params) > 0:
@@ -73,10 +75,12 @@ def validate_token(token, config):
         signing_key.key,
         algorithms=['RS256'],
         audience=config['audience'] if 'audience' in config else None,
+        leeway=60,
     )
   except jwt.exceptions.ExpiredSignatureError:
     return False, 'Expired'
-  except:
+  except jwt.exceptions.InvalidTokenError as e:
+    print('JWT Decode Error:', e)
     return False, 'Invalid'
   return (
       True,
@@ -92,13 +96,13 @@ def st_oauth(config=None, label='Login via OAuth'):
     config = _DEFAULT_SECKEY
   if isinstance(config, str):
     config = st.secrets[config]
-  if _STKEY in st.session_state:
-    token = st.session_state[_STKEY]
+  if STKEY in st.session_state:
+    token = st.session_state[STKEY]
     valid, msg = validate_token(token, config)
     if not valid:
-      del st.session_state[_STKEY]
+      del st.session_state[STKEY]
       st.warning(f'OAuth Token {msg}')
-  if _STKEY not in st.session_state:
+  if STKEY not in st.session_state:
     if not validate_config(config):
       st.error('Invalid OAuth Configuration')
       st.stop()
@@ -134,11 +138,11 @@ def st_oauth(config=None, label='Login via OAuth'):
     token = ret.json()
     valid, msg = validate_token(token, config)
     if valid:
-      st.session_state[_STKEY] = token
+      st.session_state[STKEY] = token
     else:
       st.error('Invalid OAuth Token')
       show_auth_link(config, label)
 
-  if _STKEY in st.session_state:
+  if STKEY in st.session_state:
     st.sidebar.button('Logout', on_click=logout)
   return msg

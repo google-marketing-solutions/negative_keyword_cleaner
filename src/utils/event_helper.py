@@ -19,12 +19,13 @@ import logging
 import pathlib
 from collections import OrderedDict
 from typing import Callable, Any
-
 import streamlit as st
 
 from frontend import models
 from utils import config
 from utils.config import Config
+
+logger = logging.getLogger(__name__)
 
 EVALUATIONS_FILE = (
     pathlib.Path(__file__).parents[2] / "evaluations.json"
@@ -282,7 +283,12 @@ def define_handler_scoring(
   Callable: A function that handles the scoring logic.
   """
 
-  def _inner():
+  def _inner(*_args, **_kwargs):
+    logger.debug(
+        "CLICK: _inner called for %s, agree=%s",
+        llm_eval.keyword,
+        human_agree_with_llm,
+    )
     if not human_agree_with_llm:
       state_manager.set(
           "keyword_feedback_eval",
@@ -292,6 +298,7 @@ def define_handler_scoring(
               reason=llm_eval.reason,
           ),
       )
+      st.rerun()
       return
 
     human_eval = models.KeywordEvaluation(
@@ -300,6 +307,7 @@ def define_handler_scoring(
         reason=llm_eval.reason,
     )
     _save_human_eval(human_eval=human_eval, llm_eval=llm_eval)
+    st.rerun()
 
   return _inner
 
@@ -315,8 +323,9 @@ def handler_cancel_human_eval() -> Callable:
   Callable: A function that handles the canceling of human evaluations.
   """
 
-  def _inner():
+  def _inner(*_args, **_kwargs):
     state_manager.set("keyword_feedback_eval", None)
+    st.rerun()
 
   return _inner
 
@@ -336,13 +345,14 @@ def define_handler_save_human_eval(
   Callable: A function that handles the saving of human evaluations.
   """
 
-  def _inner():
+  def _inner(*_args, **_kwargs):
     human_eval = models.KeywordEvaluation(
         keyword=llm_eval.keyword,
         decision=keyword_feedback_eval.decision,
         reason=keyword_feedback_eval.reason,
     )
     _save_human_eval(human_eval=human_eval, llm_eval=llm_eval)
+    st.rerun()
 
   return _inner
 
