@@ -66,6 +66,12 @@ def handle_advertiser_information(state_manager, llm):
 
 def _process_company_homepage(company_homepage_url, state_manager, llm):
   """Processes the company's homepage URL to gather its text."""
+  # Detect URL changes and reset state
+  if company_homepage_url != state_manager.get("previous_homepage_url", ""):
+    state_manager.set("homepage_fetched", False)
+    state_manager.set("homepage_summary", None)
+    state_manager.set("previous_homepage_url", company_homepage_url)
+
   if not company_homepage_url and not state_manager.get("manual_context"):
     st.info(
         "Once I have their website URL, I can directly read and "
@@ -86,6 +92,10 @@ def _process_company_homepage(company_homepage_url, state_manager, llm):
       )
       st.stop()
     else:
+      if not state_manager.get("homepage_fetched"):
+        if not st.button("Scan Website", key="scan_website_button"):
+          st.stop()
+
       try:
         with st.spinner("I'm browsing their website..."):
           homepage_docs = models.fetch_landing_page_text(company_homepage_url)
@@ -97,9 +107,7 @@ def _process_company_homepage(company_homepage_url, state_manager, llm):
             " will take a minute) ..."
         ):
           if not state_manager.get("homepage_summary", None):
-            homepage_summary = models.summarize_text(
-                homepage_docs, llm
-            ).strip()
+            homepage_summary = models.summarize_text(homepage_docs, llm).strip()
             state_manager.set("homepage_summary", homepage_summary)
           st.success(
               "Summarizing done but feel free to correct anything that I've"

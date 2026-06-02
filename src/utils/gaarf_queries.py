@@ -167,5 +167,6 @@ class AccountNegativeKeywords(BaseQuery):
             FROM
                 shared_criterion
             WHERE
-                shared_set.type = 'NEGATIVE_KEYWORDS'
+                shared_set.type = 'NEGATIVE_KEYWORDS' AND
+                shared_set.status = 'ENABLED'
         """

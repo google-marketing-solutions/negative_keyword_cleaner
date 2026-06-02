@@ -16,7 +16,7 @@ import os
 
 import langchain_google_genai as google_genai
 
-GEMINI_MODEL = "gemini-3.1-flash-lite-preview"
+GEMINI_MODEL = "gemini-3.1-flash-lite"
 
 
 # Select the LLM to use based on the settings set in the UI.

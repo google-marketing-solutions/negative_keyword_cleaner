@@ -191,6 +191,7 @@ class KeywordEvaluation:
   keyword: str
   decision: ScoreDecision = ScoreDecision.UNKNOWN
   reason: str = ""
+  priority_score: int = 0
 
   def should_remove(self) -> bool:
     return self.decision == ScoreDecision.REMOVE
@@ -206,20 +207,21 @@ class KeywordEvaluation:
         return ScoreDecision.UNKNOWN
 
   @classmethod
-  def from_dict(cls, data: dict[str, str]):
+  def from_dict(cls, data: dict[str, Any]):
     return cls(
         keyword=data.get("keyword", data.get("Keyword", "")),
         decision=ScoreDecision(
             data.get("decision", ScoreDecision.UNKNOWN.value)
         ),
         reason=data.get("reason", "Unspecified"),
+        priority_score=data.get("priority_score", 0),
     )
 
   def to_dict(self) -> dict:
     d = dataclasses.asdict(self, dict_factory=asdict_enum_factory)
     # Enforces order of keys to allow the LLM to produce tokens in the right
     # order.
-    ordered_keys = ["keyword", "reason", "decision"]
+    ordered_keys = ["keyword", "reason", "decision", "priority_score"]
     return dict(sorted(d.items(), key=lambda pair: ordered_keys.index(pair[0])))
 
 
@@ -233,6 +235,11 @@ class KeywordEvaluationModel(BaseModel):
   keyword: str = Field(description="The negative keyword analyzed")
   reason: str = Field(description="Concise explanation of the decision")
   decision: str = Field(description="KEEP or REMOVE")
+  priority_score: int = Field(
+      description=(
+          "Priority score (1-5, 5 being highest) for addressing this keyword"
+      )
+  )
 
 
 class KeywordEvaluations(BaseModel):

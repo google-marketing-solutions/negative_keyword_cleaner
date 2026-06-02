@@ -22,18 +22,22 @@ EXPECTED_FRAGMENT = (
     "- keyword: keyword1\n"
     "  reason:: Reason for keeping keyword1\n"
     "  decision: KEEP\n"
+    "  priority_score: 4\n"
     "- keyword: keyword2\n"
     "  reason:: Reason for removing keyword2\n"
     "  decision: REMOVE\n"
+    "  priority_score: 1\n"
 )
 
 LLM_RESPONSE = """
 - keyword: keyword1
   reason: Reason for keeping keyword1
   decision: KEEP
+  priority_score: 4
 - keyword: keyword2
   reason: Reason for removing keyword2
   decision: REMOVE
+  priority_score: 1
 """
 
 
@@ -47,6 +51,7 @@ class ModelsTest(unittest.TestCase):
                 keyword="keyword1",
                 decision=models.ScoreDecision.KEEP,
                 reason="Reason for keeping keyword1",
+                priority_score=4,
             ),
         ),
         (
@@ -55,6 +60,7 @@ class ModelsTest(unittest.TestCase):
                 keyword="keyword2",
                 decision=models.ScoreDecision.REMOVE,
                 reason="Reason for removing keyword2",
+                priority_score=1,
             ),
         ),
     ])
@@ -68,11 +74,13 @@ class ModelsTest(unittest.TestCase):
             keyword="keyword1",
             decision=models.ScoreDecision.KEEP,
             reason="Reason for keeping keyword1",
+            priority_score=4,
         ),
         models.KeywordEvaluation(
             keyword="keyword2",
             decision=models.ScoreDecision.REMOVE,
             reason="Reason for removing keyword2",
+            priority_score=1,
         ),
     ]
     self.assertEqual(

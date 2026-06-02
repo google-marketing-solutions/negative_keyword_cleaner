@@ -243,6 +243,7 @@ def _score_keywords(state_manager):
                 keyword=item.keyword,
                 decision=models.ScoreDecision(item.decision),
                 reason=item.reason,
+                priority_score=item.priority_score,
             )
         )
     else:
@@ -254,7 +255,7 @@ def _score_keywords(state_manager):
 
 def _create_prompt():
   template = textwrap.dedent("""\
-            You are a machine learning model that analyzes negative keywords for Google Ads campaigns. For each provided negative keyword, determine if it should be KEPT (to prevent ads from showing for that search term) or REMOVED (to allow ads to show for searches containing that term).
+            You are a machine learning model that analyzes negative keywords for Google Ads campaigns. For each provided negative keyword, determine if it should be KEPT (to prevent ads from showing for that search term) or REMOVED (to allow ads to show for searches containing that term). For each decision to KEEP or REMOVE, assign a priority_score to each decision where higher scores indicate keywords that should be addressed first based on the four factors examined for reason field. priority_score of 5 is the highest priority.
 
             The 'reason' field should be a well-reasoned explanation based on these factors:
 
@@ -400,6 +401,10 @@ def _split_and_display_keywords(state_manager):
       keywords_to_remove.append(item)
     else:
       keywords_unknown.append(item)
+
+  # Sort by priority_score descending
+  keywords_to_remove.sort(key=lambda x: x.priority_score, reverse=True)
+  keywords_to_keep.sort(key=lambda x: x.priority_score, reverse=True)
 
   # Track keyword feedback if a user disagrees
   if keywords_to_remove or keywords_to_keep:
@@ -727,6 +732,7 @@ def _prepare_dataframes(cached_scoring_kws_evals, filtered_keywords):
           "campaign_id": df_entry.campaign_id,
           "adgroup_id": df_entry.adgroup_id,
           "match_type": df_entry.match_type,
+          "Priority Score": student_eval.priority_score,
       }
       for student_eval in cached_scoring_kws_evals
       if student_eval.decision == models.ScoreDecision.REMOVE
@@ -755,6 +761,7 @@ def _prepare_dataframes(cached_scoring_kws_evals, filtered_keywords):
           "Status": "Enabled",
           "Student Reason": student_eval.reason,
           "Source": "Student",
+          "Priority Score": student_eval.priority_score,
           **get_df_values(
               filtered_keywords,
               student_eval.keyword,
@@ -771,6 +778,13 @@ def _prepare_dataframes(cached_scoring_kws_evals, filtered_keywords):
   # Convert the lists of dictionaries into DataFrames
   df_to_remove = pd.DataFrame(formatted_evals_to_remove)
   df_to_keep = pd.DataFrame(formatted_evals_to_keep)
+
+  if not df_to_remove.empty:
+    df_to_remove = df_to_remove.sort_values(
+        by=["Priority Score"], ascending=False
+    )
+  if not df_to_keep.empty:
+    df_to_keep = df_to_keep.sort_values(by=["Priority Score"], ascending=False)
 
   return df_to_remove, df_to_keep
 
