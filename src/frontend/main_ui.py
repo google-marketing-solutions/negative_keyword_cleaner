@@ -416,13 +416,21 @@ def _split_and_display_keywords(state_manager):
   keywords = state_manager.get("filtered_keywords")
   scored_set = state_manager.get("scored_set", set())
 
+  # Deduplicate by keyword text to prevent Streamlit Duplicate Key Errors
+  seen_kws = set()
+  unique_scored_keywords = []
+  for item in parsed_scored_keywords:
+    if item.keyword not in seen_kws:
+      seen_kws.add(item.keyword)
+      unique_scored_keywords.append(item)
+
   # Initialize lists to categorize keywords
   keywords_to_remove = []
   keywords_to_keep = []
   keywords_unknown = []
 
   # Split keywords based on the LLM's decision
-  for item in parsed_scored_keywords:
+  for item in unique_scored_keywords:
     if item.keyword in scored_set:
       continue
 
