@@ -46,6 +46,13 @@ _SCHEMA_EVALUATIONS = {}
 _DEBUG_SCORING_LIMIT = -1  # No limit: -1
 
 
+def _set_training_stopped(state_manager):
+  def _callback():
+    state_manager.set("training_stopped", True)
+
+  return _callback
+
+
 def display_page(state_manager: session_state_manager) -> None:
   """Displays the main UI page for the NKC application using Streamlit.
 
@@ -79,9 +86,26 @@ def display_page(state_manager: session_state_manager) -> None:
   # Call helper functions
   handle_advertiser_information(state_manager, llm)
   load_customers_and_campaigns(state_manager)
-  _sample_and_score_keywords(state_manager)
-  _score_remaining_keywords(state_manager)
-  _download_results(state_manager)
+
+  filtered_kws = state_manager.get("filtered_keywords")
+  has_keywords = filtered_kws is not None and not filtered_kws.empty
+
+  training_finished = (
+      state_manager.get("training_stopped", False)
+      or state_manager.get("scoring_kws_evals") is not None
+      or (
+          has_keywords
+          and len(state_manager.get("evaluations", {}))
+          >= filtered_kws.keyword.nunique()
+      )
+  )
+
+  if has_keywords:
+    if not training_finished:
+      _sample_and_score_keywords(state_manager)
+      _score_remaining_keywords(state_manager)
+    else:
+      _download_results(state_manager)
 
 
 def _display_batch_accuracy(state_manager):
@@ -153,8 +177,15 @@ def _sample_and_score_keywords(state_manager):
 
   state_manager.set("batch_completed", True)
 
-  # Provide an option to sample a new batch
-  st.button("Sample a new batch", on_click=event_helper.handle_sample_batch)
+  # Provide options to sample new batch or stop training
+  col1, col2 = st.columns(2)
+  with col1:
+    st.button("Sample a new batch", on_click=event_helper.handle_sample_batch)
+  with col2:
+    st.button(
+        "Stop training and download results",
+        on_click=_set_training_stopped(state_manager),
+    )
 
 
 def _sample_keywords(state_manager):
@@ -550,6 +581,13 @@ def _process_remaining_keywords(state_manager):
 
 
 def _download_results(state_manager):
+  # Pre-populate human evaluations to ensure Consolidated Download always works
+  df_output = _prepare_human_dataframe(state_manager)
+  if not df_output.empty:
+    st.session_state["df_to_remove_human"] = df_output[
+        df_output["human_decision"] == "REMOVE"
+    ]
+
   if state_manager.get("scoring_kws_evals", None):
     _prepare_and_display_downloads(state_manager)
   _handle_stop_training(state_manager)
@@ -790,21 +828,17 @@ def _prepare_dataframes(cached_scoring_kws_evals, filtered_keywords):
 
 
 def _handle_stop_training(state_manager):
-  st.header("Download negative keywords to remove")
-  st.markdown(
-      "Identified by the AI Student **and confirmed by a human expert**!"
-  )
-
-  if st.button("Stop the training", key="stop_training"):
-    df_output = _prepare_human_dataframe(state_manager)
-    if not df_output.empty:
-      df_to_remove_human = df_output[df_output["human_decision"] == "REMOVE"]
-      st.session_state["df_to_remove_human"] = df_to_remove_human
-      st.dataframe(df_output, height=200)
-      st.download_button(
-          "Download human scorings",
-          df_output.to_csv(index=False),
-          file_name="negative_keywords_used_to_train_student.csv",
-      )
-    else:
-      st.warning("No filtered keywords are available.")
+  df_output = _prepare_human_dataframe(state_manager)
+  if not df_output.empty:
+    st.header("Download negative keywords to remove")
+    st.markdown(
+        "Identified by the AI Student **and confirmed by a human expert**!"
+    )
+    df_to_remove_human = df_output[df_output["human_decision"] == "REMOVE"]
+    st.session_state["df_to_remove_human"] = df_to_remove_human
+    st.dataframe(df_output, height=200)
+    st.download_button(
+        "Download human scorings",
+        df_output.to_csv(index=False),
+        file_name="negative_keywords_used_to_train_student.csv",
+    )
