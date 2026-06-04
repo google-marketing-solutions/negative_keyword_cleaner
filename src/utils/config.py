@@ -86,7 +86,7 @@ class Config:
         blob = bucket.blob(GCS_CONFIG_FILE)
         try:
             with open(
-                "/tmp/app_config.yaml", "w", encoding="utf-8"
+                "/tmp/app_config.yaml", "wb"
             ) as file_obj:
                 blob.download_to_file(file_obj)
         except exceptions.NotFound:
