@@ -180,6 +180,7 @@ def handle_continue_with_filters() -> None:
   Set the session state to indicate that filters are ready.
   """
   state_manager.set("filters_ready", True)
+  state_manager.set("filter_campaigns_open", False)
 
 
 def score_batch_evals() -> None:

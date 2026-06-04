@@ -114,3 +114,8 @@ html, body, p, div, [class*="css"] {
 h2 {
   font-family: 'Product Sans Black', sans-serif;
 }
+
+.block-container, .stMainBlockContainer {
+  padding-top: 2rem !important;
+  padding-bottom: 3rem !important;
+}

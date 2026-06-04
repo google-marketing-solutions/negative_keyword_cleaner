@@ -116,7 +116,7 @@ def _filter_campaigns(state_manager):
           selected_campaigns
       )
       filtered_keywords = filtered_keywords[campaigns_filter]
-      state_manager.set("filtered_keywords", filtered_keywords)
+    state_manager.set("filtered_keywords", filtered_keywords)
 
     col1, col2, col3 = st.columns(3)
     col1.metric(
