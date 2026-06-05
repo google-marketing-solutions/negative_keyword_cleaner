@@ -37,29 +37,20 @@ use now, you may proceed with the steps below.
    ```
    git clone https://github.com/google-marketing-solutions/negative_keyword_cleaner
    cd negative_keyword_cleaner
-   export TF_VAR_project_id=$(gcloud config list --format 'value(core.project)')
+    export TF_VAR_project_id=$(gcloud config list --format 'value(core.project)')
+   # Region used for every resource (Artifact Registry, Cloud Run, bucket).
+   # Must be consistent everywhere below; it is also passed to Terraform.
+   export TF_VAR_location=europe-west1
    ```
-5. Create a service account for the Cloud Run service to use.
-   ```
-   gcloud iam service-accounts create neg-keywords-cleaner \
-     --display-name "Negative Keywords Cleaner"
-   ```
-6. Grant the necessary permissions to the service account.
-    ```
-    gcloud projects add-iam-policy-binding $TF_VAR_project_id \
-      --member="serviceAccount:neg-keywords-cleaner@$TF_VAR_project_id.iam.gserviceaccount.com" \
-      --role="roles/run.invoker"
-    gcloud projects add-iam-policy-binding $TF_VAR_project_id \
-      --member="serviceAccount:neg-keywords-cleaner@$TF_VAR_project_id.iam.gserviceaccount.com" \
-      --role="roles/storage.admin"
-    ```
-7. Create an Artifact Registry repository.
+   > The service account used by Cloud Run, and its IAM roles, are created by
+   Terraform in Step 7. You do not need to create them manually.
+5. Create an Artifact Registry repository (same region as `TF_VAR_location`).
     ```
     gcloud artifacts repositories create negatives \
       --repository-format=docker \
-      --location=us-central1
+      --location=$TF_VAR_location
     ```
-8. Replace the ... with the Client ID and Client Secret obtained in Step 2
+6. Replace the ... with the Client ID and Client Secret obtained in Step 2
    ```
    echo 'google_oauth_client_id = "..."' > terraform/secrets.tfvars
    echo 'google_oauth_client_secret = "..."' >> terraform/secrets.tfvars
@@ -71,16 +62,16 @@ use now, you may proceed with the steps below.
    app
    will be visible to all users with the url per default).
 
-9. Build and deploy container
+7. Build and deploy container
    ```
-   docker build -t us-central1-docker.pkg.dev/$TF_VAR_project_id/negatives/negatives:v1 . --no-cache
-   docker push us-central1-docker.pkg.dev/$TF_VAR_project_id/negatives/negatives:v1
+   docker build -t $TF_VAR_location-docker.pkg.dev/$TF_VAR_project_id/negatives/negatives:v1 . --no-cache
+   docker push $TF_VAR_location-docker.pkg.dev/$TF_VAR_project_id/negatives/negatives:v1
    ```
-   > If it doesn't deploy, you might have to run `gcloud auth configure-docker us-central1-docker.pkg.dev`
+   > If it doesn't deploy, you might have to run `gcloud auth configure-docker $TF_VAR_location-docker.pkg.dev`
    and
    try again.
 
-10. Deploy the solution
+8. Deploy the solution
     ```
     cd terraform/
     terraform init -upgrade
@@ -88,7 +79,7 @@ use now, you may proceed with the steps below.
     ```
     > Take note of the **App URL**. *Example: https://myapp.run.app*
 
-11. Go back to Credentials > OAuth 2.0 Client ID and select your Client ID.
+9. Go back to Credentials > OAuth 2.0 Client ID and select your Client ID.
     * Add the App URL into the list of **Authorized Redirect URL**.
 
 ## Uninstall

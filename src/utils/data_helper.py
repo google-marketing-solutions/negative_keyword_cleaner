@@ -42,6 +42,10 @@ def load_keywords(selected_customers: list) -> pd.DataFrame:
         st.error(f"Could not initialize the Google Ads client: {e}")
         st.stop()
 
+    if not kw_helper.report_fetcher:
+        st.error("An internal error occurred. Could not load KeywordHelper.")
+        return
+
     with st.spinner(
         text="Loading negative keywords... This may take a few minutes"
     ):
@@ -139,6 +143,10 @@ def load_customers(customer_ids: list[str]) -> pd.DataFrame:
     except exceptions.GoogleAPIError as e:
         st.error(f"Could not initialize the Google Ads client: {e}")
         st.stop()
+
+    if not kw_helper.report_fetcher:
+        st.error("An internal error occurred. Could not load KeywordHelper.")
+        return
 
     with st.spinner(text="Loading customers under MCC, please wait..."):
         customers_report = kw_helper.get_customers(customer_ids)

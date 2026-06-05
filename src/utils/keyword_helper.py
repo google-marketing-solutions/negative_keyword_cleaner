@@ -14,10 +14,12 @@
 
 """Module containing helper classes and functions for keywords."""
 
+import logging
 import re
 from enum import Enum
 from typing import Sequence, Union
 
+from google.api_core import exceptions
 from gaarf import GaarfReport
 from gaarf.api_clients import GoogleAdsApiClient
 from gaarf.query_editor import QuerySpecification
@@ -145,24 +147,29 @@ class KeywordHelper:
   """Helper class for fetching and processing keywords."""
 
   def __init__(self, config: Config):
-    # Expand the mcc account to child accounts to initialize the report fetcher
-    googleads_api_client = GoogleAdsApiClient(
-        config_dict={
-            "developer_token": config.developer_token,
-            "login_customer_id": config.login_customer_id,
-            "use_proto_plus": config.use_proto_plus,
-            "client_id": auth._OAUTH_CLIENT_ID,
-            "client_secret": auth._OAUTH_CLIENT_SECRET,
-            "refresh_token": auth.get_refresh_token(),
-        },
-        version=_GOOGLE_ADS_API_VERSION,
-    )
-    customer_ids = get_customer_ids(
-        googleads_api_client, config.login_customer_id
-    )
-    self.report_fetcher = AdsReportFetcher(
-        googleads_api_client, customer_ids=customer_ids
-    )
+    self.report_fetcher = None
+    try:
+      # Expand the mcc account to child accounts to initialize the report
+      # fetcher
+      googleads_api_client = GoogleAdsApiClient(
+          config_dict={
+              "developer_token": config.developer_token,
+              "login_customer_id": config.login_customer_id,
+              "use_proto_plus": config.use_proto_plus,
+              "client_id": auth._OAUTH_CLIENT_ID,
+              "client_secret": auth._OAUTH_CLIENT_SECRET,
+              "refresh_token": auth.get_refresh_token(),
+          },
+          version=_GOOGLE_ADS_API_VERSION,
+      )
+      customer_ids = get_customer_ids(
+          googleads_api_client, config.login_customer_id
+      )
+      self.report_fetcher = AdsReportFetcher(
+          googleads_api_client, customer_ids=customer_ids
+      )
+    except exceptions.InternalServerError:
+      logging.exception("Failed to initialize the Google Ads report fetcher.")
 
   def get_customers(self, customer_ids: list[str]) -> GaarfReport:
     """Loads customer data for a given list of IDs.
