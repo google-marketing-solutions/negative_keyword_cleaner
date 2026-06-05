@@ -27,8 +27,6 @@ except ImportError as err:
 except Exception as err:
   print(f"Failed to import local env variables: {err}")
 
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
 import streamlit as st
 import utils.st_oauth as oauth
 
@@ -94,24 +92,3 @@ def get_refresh_token():
   return oauth_result.get("refresh_token")
 
 
-def get_credentials(config: Dict[str, Any]):
-  user_info = {
-      "client_id": config["client_id"],
-      "refresh_token": config["refresh_token"],
-      "client_secret": config["client_secret"],
-  }
-  creds = Credentials.from_authorized_user_info(user_info)
-
-  # If credentials are expired, refresh.
-  if creds.expired:
-    try:
-      creds.refresh(Request())
-    except Exception as error:
-      if error.args and "invalid_scope" in error.args[0]:
-        return None
-      raise
-
-  if creds is None or not creds.valid:
-    return None
-
-  return creds

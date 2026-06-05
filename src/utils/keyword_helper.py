@@ -149,8 +149,8 @@ class KeywordHelper:
   def __init__(self, config: Config):
     self.report_fetcher = None
     try:
-      # Expand the mcc account to child accounts to initialize the report
-      # fetcher
+      # Expand the mcc account to child accounts to initialize the
+      # report fetcher.
       googleads_api_client = GoogleAdsApiClient(
           config_dict={
               "developer_token": config.developer_token,

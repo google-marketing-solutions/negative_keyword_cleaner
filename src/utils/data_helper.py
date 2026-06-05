@@ -18,24 +18,41 @@ from google.api_core import exceptions
 import pandas as pd
 import streamlit as st
 
+from utils.event_helper import session_id
 from utils.keyword_helper import KeywordHelper, Customer
 
+_CACHE_TTL_SECONDS = 600
 
-@st.cache_data(show_spinner=False)
+
 def load_keywords(selected_customers: list) -> pd.DataFrame:
-    """
-    Load negative keywords based on the selected customers.
+    """Loads negative keywords for the selected customers.
 
-    This function retrieves negative keywords using the KeywordHelper class,
-    cleans and deduplicates them, and returns them in a DataFrame.
+    Results are cached per session (see _load_keywords_cached) so they are never
+    shared with other users on the same server instance.
 
     Parameters:
     selected_customers (list): A list of selected customer identifiers.
 
     Returns:
-    pd.DataFrame: A DataFrame containing the negative keywords along with
-      additional information.
+    pd.DataFrame: A DataFrame containing the negative keywords.
     """
+    return _load_keywords_cached(session_id(), tuple(selected_customers))
+
+
+@st.cache_data(ttl=_CACHE_TTL_SECONDS, show_spinner=False)
+def _load_keywords_cached(
+    session_key: str, selected_customers: tuple[str, ...]
+) -> pd.DataFrame:
+    """Fetches and cleans negative keywords.
+
+    The session_key argument scopes the cache to a single session; it is part of
+    the cache key and intentionally not prefixed with an underscore.
+
+    Args:
+      session_key: The session identifier.
+      selected_customers: Tuple of selected customer IDs.
+    """
+    _ = session_key
     try:
         kw_helper = KeywordHelper(st.session_state.config)
     except exceptions.GoogleAPIError as e:
@@ -128,9 +145,11 @@ def load_keywords(selected_customers: list) -> pd.DataFrame:
     return negative_keyword_list
 
 
-@st.cache_data(show_spinner=False)
 def load_customers(customer_ids: list[str]) -> pd.DataFrame:
     """Loads customer data for a given list of IDs.
+
+    Results are cached per session so they are never shared with other users on
+    the same server instance.
 
     Args:
       customer_ids: A list of customer ID strings to fetch.
@@ -138,6 +157,20 @@ def load_customers(customer_ids: list[str]) -> pd.DataFrame:
     Returns:
       A pandas DataFrame containing the customer data.
     """
+    return _load_customers_cached(session_id(), customer_ids)
+
+
+@st.cache_data(ttl=_CACHE_TTL_SECONDS, show_spinner=False)
+def _load_customers_cached(
+    session_key: str, customer_ids: list[str]
+) -> pd.DataFrame:
+    """Fetches customer data; session_key scopes the cache to one session.
+
+    Args:
+      session_key: The session identifier.
+      customer_ids: List of customer ID strings to fetch.
+    """
+    _ = session_key
     try:
         kw_helper = KeywordHelper(st.session_state.config)
     except exceptions.GoogleAPIError as e:

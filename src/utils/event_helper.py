@@ -17,6 +17,8 @@
 import json
 import logging
 import pathlib
+import tempfile
+import uuid
 from collections import OrderedDict
 from typing import Callable, Any
 import streamlit as st
@@ -27,9 +29,28 @@ from utils.config import Config
 
 logger = logging.getLogger(__name__)
 
-EVALUATIONS_FILE = (
-    pathlib.Path(__file__).parents[2] / "evaluations.json"
-).absolute()
+
+def session_id() -> str:
+  """Returns a stable per-session identifier.
+
+  Used to isolate cached and persisted data so concurrent users sharing the
+  same server instance never read or overwrite each other's data.
+  """
+  if "_session_id" not in st.session_state:
+    st.session_state["_session_id"] = uuid.uuid4().hex
+  return st.session_state["_session_id"]
+
+
+def evaluations_file() -> pathlib.Path:
+  """Returns the per-session file used to persist human evaluations.
+
+  Each browser session gets its own file under the system temp dir, instead of
+  a single shared file in the source tree, so evaluations are never mixed up
+  between users on the same instance.
+  """
+  return (
+      pathlib.Path(tempfile.gettempdir()) / f"evaluations_{session_id()}.json"
+  )
 
 
 class session_state_manager:  # pylint: disable=invalid-name
@@ -105,9 +126,10 @@ class session_state_manager:  # pylint: disable=invalid-name
     return list(st.session_state.keys())
 
   def load_evaluations_from_disk(self):
-    """Loads evaluations from a JSON file."""
-    if EVALUATIONS_FILE.exists():
-      with open(EVALUATIONS_FILE, "r", encoding="utf-8") as f:
+    """Loads evaluations from this session's JSON file."""
+    evaluations_path = evaluations_file()
+    if evaluations_path.exists():
+      with open(evaluations_path, "r", encoding="utf-8") as f:
         evals_data = json.load(f)
         return OrderedDict(
             (k, models.KeywordEvaluation(**v))
@@ -116,12 +138,12 @@ class session_state_manager:  # pylint: disable=invalid-name
     return OrderedDict()
 
   def save_evaluations_to_disk(self):
-    """Saves evaluations to a JSON file."""
+    """Saves evaluations to this session's JSON file."""
     evaluations = self.get("evaluations", {})
     evals_data = {
         k: v.__dict__ for k, v in evaluations.items()
     }
-    with open(EVALUATIONS_FILE, "w", encoding="utf-8") as f:
+    with open(evaluations_file(), "w", encoding="utf-8") as f:
       json.dump(evals_data, f)
 
 

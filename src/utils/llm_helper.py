@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os
 
 import langchain_google_genai as google_genai
@@ -23,7 +24,7 @@ GEMINI_MODEL = "gemini-3.1-flash-lite"
 def select_llm(config):
     if not config.google_api_key:
         raise ValueError("Google API Key is required for Gemini.")
-    print("Picked Gemini model for summarizing")
+    logging.info("Picked Gemini Flash model (%s).", GEMINI_MODEL)
     os.environ["GOOGLE_API_KEY"] = config.google_api_key
     return google_genai.ChatGoogleGenerativeAI(
         model=GEMINI_MODEL,
