@@ -1,3 +1,0 @@
-Refactor: Adopt LCEL, Structured Outputs, break down main_ui, and fix dependencies
-
-Change-Id: Ib84f1245a8fbfa1f3802315b1e3f9d5446234e37

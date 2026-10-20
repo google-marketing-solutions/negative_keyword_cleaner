@@ -15,7 +15,7 @@
 
 """Module containing data models and helper functions for the frontend."""
 
-from collections import OrderedDict
+import collections
 import dataclasses
 import enum
 import logging
@@ -32,6 +32,7 @@ from langchain_text_splitters import CharacterTextSplitter
 import pandas as pd
 from pydantic import BaseModel
 from pydantic import Field
+from pydantic import field_validator
 import requests
 import streamlit as st
 import yaml
@@ -65,11 +66,11 @@ def get_random_state(force_new: bool = False) -> int:
 
   If force_new is True or no state exists, generates a new state.
 
-  Parameters:
-  force_new (bool): Force the generation of a new random state.
+  Args:
+    force_new: Force the generation of a new random state.
 
   Returns:
-  int: The random state integer.
+    The random state integer.
   """
   random_state = st.session_state.get("random_seed")
   if force_new or not random_state:
@@ -217,7 +218,7 @@ class KeywordEvaluation:
         priority_score=data.get("priority_score", 0),
     )
 
-  def to_dict(self) -> dict:
+  def to_dict(self) -> dict[str, Any]:
     d = dataclasses.asdict(self, dict_factory=asdict_enum_factory)
     # Enforces order of keys to allow the LLM to produce tokens in the right
     # order.
@@ -232,17 +233,33 @@ class EvaluationPair:
 
 
 class KeywordEvaluationModel(BaseModel):
+  """Pydantic model for a single LLM keyword evaluation."""
+
   keyword: str = Field(description="The negative keyword analyzed")
   reason: str = Field(description="Concise explanation of the decision")
-  decision: str = Field(description="KEEP or REMOVE")
+  decision: ScoreDecision = Field(description="KEEP or REMOVE")
   priority_score: int = Field(
+      default=0,
       description=(
           "Priority score (1-5, 5 being highest) for addressing this keyword"
-      )
+      ),
   )
+
+  @field_validator("decision", mode="before")
+  @classmethod
+  def _normalize_decision(cls, value: Any) -> ScoreDecision:
+    if isinstance(value, ScoreDecision):
+      return value
+    if isinstance(value, str):
+      upper_val = value.strip().upper()
+      if upper_val in ScoreDecision.__members__:
+        return ScoreDecision(upper_val)
+    return ScoreDecision.UNKNOWN
 
 
 class KeywordEvaluations(BaseModel):
+  """Pydantic container for a list of LLM keyword evaluations."""
+
   evaluations: List[KeywordEvaluationModel]
 
 
@@ -254,14 +271,14 @@ def sample_batch(
 ) -> pd.DataFrame:
   """Samples a batch of keywords from the provided DataFrame.
 
-  Parameters:
-  df (pd.DataFrame): The DataFrame to sample from.
-  batch_size (int): The size of the batch to sample.
-  exclude_keywords (Optional[set[str]]): Keywords to exclude from sampling.
-  random_state (int): Random state for reproducibility.
+  Args:
+    df: The DataFrame to sample from.
+    batch_size: The size of the batch to sample.
+    exclude_keywords: Keywords to exclude from sampling.
+    random_state: Random state for reproducibility.
 
   Returns:
-  pd.DataFrame: A DataFrame containing the sampled batch.
+    A DataFrame containing the sampled batch.
   """
   if exclude_keywords:
     df_filtered = df[~df["keyword"].isin(exclude_keywords)]
@@ -274,15 +291,15 @@ def sample_batch(
 
 
 def format_scoring_fragment(
-    evaluations: OrderedDict[str, KeywordEvaluation],
+    evaluations: collections.OrderedDict[str, KeywordEvaluation],
 ) -> str:
   """Formats the given evaluations for the LLM.
 
-  Parameters:
-  evaluations (OrderedDict[str, KeywordEvaluation]): Evaluations to format.
+  Args:
+    evaluations: Evaluations to format.
 
   Returns:
-  str: A string representation of the evaluations in YAML format.
+    A string representation of the evaluations in YAML format.
   """
   data = [e.to_dict() for e in evaluations.values()]
   yaml_str = yaml.dump(
@@ -299,57 +316,129 @@ def format_scoring_fragment(
   return "\n".join(modified_lines)
 
 
-def _clean_yaml_response(response: str) -> str:
-  """Cleans the LLM response for YAML parsing."""
-  return (
-      response.replace("```yaml", "")
-      .replace("```YAML", "")
-      .replace("```", "")
-      .replace("---", "")
-      .strip()
-  )
-
-
-def parse_scoring_response(response: str) -> List[KeywordEvaluation]:
-  """Parses the LLM response in YAML format into KeywordEvaluation objects.
+def prepare_human_dataframe(
+    filtered_keywords: pd.DataFrame,
+    evaluations: dict[str, KeywordEvaluation],
+) -> pd.DataFrame:
+  """Prepares a DataFrame of human evaluations.
 
   Args:
-      response (str): The LLM response.
+    filtered_keywords: DataFrame containing the filtered keywords.
+    evaluations: Mapping of keyword string to human KeywordEvaluation.
 
   Returns:
-      List[KeywordEvaluation]: A list of parsed keyword evaluations.
+    A pandas DataFrame containing the human evaluations, or an empty DataFrame
+    if no matching filtered keywords are available.
   """
+  if filtered_keywords is None or filtered_keywords.empty or not evaluations:
+    return pd.DataFrame()
 
-  response = _clean_yaml_response(response)
+  first_by_kw = (
+      filtered_keywords.drop_duplicates(subset=["keyword"])
+      .set_index("keyword")[
+          ["original_keyword", "campaign_name", "campaign_id", "adgroup_id"]
+      ]
+      .to_dict("index")
+  )
+  formatted_evals = [
+      {
+          "keyword": kw,
+          "original_keyword": first_by_kw[kw]["original_keyword"],
+          "human_decision": str(human_eval.decision),
+          "human_reason": human_eval.reason,
+          "campaign_name": first_by_kw[kw]["campaign_name"],
+          "campaign_id": first_by_kw[kw]["campaign_id"],
+          "adgroup_id": first_by_kw[kw]["adgroup_id"],
+          "Source": "Human",
+      }
+      for kw, human_eval in evaluations.items()
+      if kw in first_by_kw
+  ]
+  return pd.DataFrame(formatted_evals)
 
-  if not response:
-    return []
 
-  try:
-    yaml.safe_load(response)
-  except yaml.parser.ParserError as e:
-    logger.error("Error parsing YAML data: %s", e)
-    logger.error("Original Content: %s", response)
-    return []
+def _format_criterion_type(adgroup_name: str, match_type: str) -> str:
+  """Formats the Google Ads Editor criterion type string."""
+  prefix = "Negative " if adgroup_name else "Campaign Negative "
+  match_type_map = {
+      "BROAD": "Broad",
+      "PHRASE": "Phrase",
+  }
+  return prefix + match_type_map.get(match_type, "Exact")
 
-  outputs = []
-  for item_yaml in response.split("\n-"):
-    item_yaml = item_yaml.strip()
-    if not item_yaml:
-      continue
 
-    try:
-      item_yaml = (
-          "- " + item_yaml if not item_yaml.startswith("-") else item_yaml
+def prepare_dataframes(
+    cached_scoring_kws_evals: List[KeywordEvaluation],
+    filtered_keywords: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+  """Prepares DataFrames for keywords to remove and keywords to keep.
+
+  Args:
+    cached_scoring_kws_evals: List of student evaluations.
+    filtered_keywords: DataFrame containing the filtered keywords.
+
+  Returns:
+    Tuple of (df_to_remove, df_to_keep).
+  """
+  if filtered_keywords is None or filtered_keywords.empty:
+    return pd.DataFrame(), pd.DataFrame()
+
+  first_by_kw = (
+      filtered_keywords.drop_duplicates(subset=["keyword"])
+      .set_index("keyword")[
+          ["original_keyword", "campaign_id", "adgroup_id", "account_id"]
+      ]
+      .to_dict("index")
+  )
+  rows_by_kw: dict[str, list[Any]] = {}
+  for df_entry in filtered_keywords.itertuples():
+    if df_entry.campaign_name or df_entry.adgroup_id:
+      rows_by_kw.setdefault(df_entry.keyword, []).append(df_entry)
+
+  formatted_evals_to_remove = []
+  formatted_evals_to_keep = []
+  for student_eval in cached_scoring_kws_evals:
+    for df_entry in rows_by_kw.get(student_eval.keyword, []):
+      criterion_type = _format_criterion_type(
+          df_entry.adgroup_name, df_entry.match_type
       )
-      item = yaml.safe_load(item_yaml)
-      if isinstance(item[0], dict):
-        outputs.append(KeywordEvaluation.from_dict(item[0]))
-    except (yaml.parser.ParserError, TypeError, ValueError) as e:
-      logger.error(
-          "Failed to parse keyword: %s. Original Content: %s",
-          e,
-          item_yaml,
-      )
+      if student_eval.decision == ScoreDecision.REMOVE:
+        formatted_evals_to_remove.append({
+            "Account": df_entry.account_name,
+            "Campaign": df_entry.campaign_name,
+            "Ad Group": df_entry.adgroup_name,
+            "Keyword": student_eval.keyword,
+            "Criterion Type": criterion_type,
+            "Status": "Removed",
+            "Student Reason": student_eval.reason,
+            "Source": "Student",
+            "campaign_id": df_entry.campaign_id,
+            "adgroup_id": df_entry.adgroup_id,
+            "match_type": df_entry.match_type,
+            "Priority Score": student_eval.priority_score,
+        })
+      elif student_eval.decision == ScoreDecision.KEEP:
+        formatted_evals_to_keep.append({
+            "Account": df_entry.account_name,
+            "Campaign": df_entry.campaign_name,
+            "Ad Group": df_entry.adgroup_name,
+            "Keyword": student_eval.keyword,
+            "Criterion Type": criterion_type,
+            "Status": "Enabled",
+            "Student Reason": student_eval.reason,
+            "Source": "Student",
+            "Priority Score": student_eval.priority_score,
+            **first_by_kw[student_eval.keyword],
+        })
 
-  return outputs
+  df_to_remove = pd.DataFrame(formatted_evals_to_remove)
+  df_to_keep = pd.DataFrame(formatted_evals_to_keep)
+
+  if not df_to_remove.empty:
+    df_to_remove = df_to_remove.sort_values(
+        by=["Priority Score"], ascending=False
+    )
+  if not df_to_keep.empty:
+    df_to_keep = df_to_keep.sort_values(by=["Priority Score"], ascending=False)
+
+  return df_to_remove, df_to_keep

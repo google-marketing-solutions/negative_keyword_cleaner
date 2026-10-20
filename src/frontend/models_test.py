@@ -16,6 +16,7 @@ import collections
 import unittest
 
 from frontend import models
+import pandas as pd
 
 # format_scoring_fragment rewrites "reason:" to "reason::" by design.
 EXPECTED_FRAGMENT = (
@@ -28,17 +29,6 @@ EXPECTED_FRAGMENT = (
     "  decision: REMOVE\n"
     "  priority_score: 1\n"
 )
-
-LLM_RESPONSE = """
-- keyword: keyword1
-  reason: Reason for keeping keyword1
-  decision: KEEP
-  priority_score: 4
-- keyword: keyword2
-  reason: Reason for removing keyword2
-  decision: REMOVE
-  priority_score: 1
-"""
 
 
 class ModelsTest(unittest.TestCase):
@@ -68,25 +58,94 @@ class ModelsTest(unittest.TestCase):
         models.format_scoring_fragment(evaluations), EXPECTED_FRAGMENT
     )
 
-  def test_parse_scoring_response(self):
-    expected_evaluations = [
+  def test_keyword_evaluation_model_normalizes_decision(self):
+    parsed = models.KeywordEvaluations(
+        evaluations=[
+            models.KeywordEvaluationModel(
+                keyword="keyword1",
+                reason="Reason for keeping keyword1",
+                decision="keep",
+                priority_score=4,
+            ),
+            models.KeywordEvaluationModel(
+                keyword="keyword2",
+                reason="Reason for removing keyword2",
+                decision="REMOVE",
+                priority_score=5,
+            ),
+        ]
+    )
+    self.assertEqual(
+        parsed.evaluations[0].decision, models.ScoreDecision.KEEP
+    )
+    self.assertEqual(parsed.evaluations[0].priority_score, 4)
+    self.assertEqual(
+        parsed.evaluations[1].decision, models.ScoreDecision.REMOVE
+    )
+    self.assertEqual(parsed.evaluations[1].priority_score, 5)
+
+  def test_prepare_dataframes_preserves_priority_and_columns(self):
+    filtered_keywords = pd.DataFrame([
+        {
+            "keyword": "kw_remove",
+            "original_keyword": "[kw_remove]",
+            "match_type": "EXACT",
+            "campaign_name": "Camp A",
+            "campaign_id": "111",
+            "adgroup_id": "222",
+            "adgroup_name": "AdGroup 1",
+            "account_id": "333",
+            "account_name": "Account 1",
+        },
+        {
+            "keyword": "kw_keep",
+            "original_keyword": '"kw_keep"',
+            "match_type": "PHRASE",
+            "campaign_name": "Camp B",
+            "campaign_id": "444",
+            "adgroup_id": "",
+            "adgroup_name": "",
+            "account_id": "333",
+            "account_name": "Account 1",
+        },
+    ])
+    evals = [
         models.KeywordEvaluation(
-            keyword="keyword1",
-            decision=models.ScoreDecision.KEEP,
-            reason="Reason for keeping keyword1",
-            priority_score=4,
+            keyword="kw_remove",
+            decision=models.ScoreDecision.REMOVE,
+            reason="Blocks relevant queries",
+            priority_score=5,
         ),
         models.KeywordEvaluation(
-            keyword="keyword2",
-            decision=models.ScoreDecision.REMOVE,
-            reason="Reason for removing keyword2",
-            priority_score=1,
+            keyword="kw_keep",
+            decision=models.ScoreDecision.KEEP,
+            reason="Protects brand",
+            priority_score=3,
         ),
     ]
-    self.assertEqual(
-        models.parse_scoring_response(LLM_RESPONSE),
-        expected_evaluations,
+    df_to_remove, df_to_keep = models.prepare_dataframes(
+        evals, filtered_keywords
     )
+    self.assertEqual(len(df_to_remove), 1)
+    self.assertEqual(df_to_remove.iloc[0]["Keyword"], "kw_remove")
+    self.assertEqual(df_to_remove.iloc[0]["Priority Score"], 5)
+    self.assertEqual(df_to_remove.iloc[0]["Criterion Type"], "Negative Exact")
+
+    self.assertEqual(len(df_to_keep), 1)
+    self.assertEqual(df_to_keep.iloc[0]["Keyword"], "kw_keep")
+    self.assertEqual(df_to_keep.iloc[0]["Priority Score"], 3)
+    self.assertEqual(
+        df_to_keep.iloc[0]["Criterion Type"], "Campaign Negative Phrase"
+    )
+    self.assertEqual(df_to_keep.iloc[0]["original_keyword"], '"kw_keep"')
+
+    human_df = models.prepare_human_dataframe(
+        filtered_keywords,
+        {"kw_remove": evals[0]},
+    )
+    self.assertEqual(len(human_df), 1)
+    self.assertEqual(human_df.iloc[0]["human_decision"], "REMOVE")
+    self.assertEqual(human_df.iloc[0]["original_keyword"], "[kw_remove]")
 
 
 if __name__ == "__main__":

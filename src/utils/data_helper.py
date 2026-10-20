@@ -19,185 +19,185 @@ import pandas as pd
 import streamlit as st
 
 from utils.event_helper import session_id
-from utils.keyword_helper import KeywordHelper, Customer
+from utils.keyword_helper import Customer
+from utils.keyword_helper import KeywordHelper
 
 _CACHE_TTL_SECONDS = 600
 
 
-def load_keywords(selected_customers: list) -> pd.DataFrame:
-    """Loads negative keywords for the selected customers.
+def load_keywords(selected_customers: list[str]) -> pd.DataFrame:
+  """Loads negative keywords for the selected customers.
 
-    Results are cached per session (see _load_keywords_cached) so they are never
-    shared with other users on the same server instance.
+  Results are cached per session (see _load_keywords_cached) so they are never
+  shared with other users on the same server instance.
 
-    Parameters:
-    selected_customers (list): A list of selected customer identifiers.
+  Args:
+    selected_customers: A list of selected customer identifiers.
 
-    Returns:
-    pd.DataFrame: A DataFrame containing the negative keywords.
-    """
-    return _load_keywords_cached(session_id(), tuple(selected_customers))
+  Returns:
+    A DataFrame containing the negative keywords.
+  """
+  negative_kws_df, positive_kws_df = _load_keywords_cached(
+      session_id(), tuple(selected_customers)
+  )
+  if positive_kws_df is not None and not positive_kws_df.empty:
+    st.session_state["positive_keywords"] = positive_kws_df
+  return negative_kws_df
 
 
 @st.cache_data(ttl=_CACHE_TTL_SECONDS, show_spinner=False)
 def _load_keywords_cached(
     session_key: str, selected_customers: tuple[str, ...]
-) -> pd.DataFrame:
-    """Fetches and cleans negative keywords.
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+  """Fetches and cleans negative and positive keywords.
 
-    The session_key argument scopes the cache to a single session; it is part of
-    the cache key and intentionally not prefixed with an underscore.
+  The session_key argument scopes the cache to a single session; it is part of
+  the cache key and intentionally not prefixed with an underscore.
 
-    Args:
-      session_key: The session identifier.
-      selected_customers: Tuple of selected customer IDs.
-    """
-    _ = session_key
-    try:
-        kw_helper = KeywordHelper(st.session_state.config)
-    except exceptions.GoogleAPIError as e:
-        st.error(f"Could not initialize the Google Ads client: {e}")
-        st.stop()
+  Args:
+    session_key: The session identifier.
+    selected_customers: Tuple of selected customer IDs.
+  """
+  _ = session_key
+  try:
+    kw_helper = KeywordHelper(st.session_state.config)
+  except exceptions.GoogleAPIError as e:
+    st.error(f"Could not initialize the Google Ads client: {e}")
+    st.stop()
 
-    if not kw_helper.report_fetcher:
-        st.error("An internal error occurred. Could not load KeywordHelper.")
-        return
+  if not kw_helper.report_fetcher:
+    st.error("An internal error occurred. Could not load KeywordHelper.")
+    return pd.DataFrame(), pd.DataFrame()
 
-    with st.spinner(
-        text="Loading negative keywords... This may take a few minutes"
-    ):
-        clean_selected_customers = [
-            s.replace("-", "") for s in selected_customers
-        ]
-        negative_kws_report = kw_helper.get_neg_keywords(
-            clean_selected_customers
-        )
-        if not negative_kws_report:
-            st.warning("No negative keywords found")
-            st.stop()
+  positive_keyword_list = pd.DataFrame()
+  with st.spinner(
+      text="Loading negative keywords... This may take a few minutes"
+  ):
+    clean_selected_customers = [s.replace("-", "") for s in selected_customers]
+    negative_kws_report = kw_helper.get_neg_keywords(clean_selected_customers)
+    if not negative_kws_report:
+      st.warning("No negative keywords found")
+      st.stop()
 
-        positive_kws_report = kw_helper.get_positive_keywords(
-            clean_selected_customers
-        )
-        if positive_kws_report:
-            positive_kws = kw_helper.clean_and_dedup(positive_kws_report)
-            positive_keyword_data = []
-            for keywords in positive_kws.values():
-                for kw in keywords:
-                    positive_keyword_data.append(
-                        (
-                            kw.get_clean_keyword_text(),
-                            kw.kw_text,
-                            kw.match_type,
-                            kw.campaign_name,
-                            kw.campaign_id,
-                            kw.adgroup_id,
-                            kw.adgroup_name,
-                            kw.account_id,
-                            kw.account_name,
-                        )
-                    )
-            positive_keyword_list = pd.DataFrame(
-                positive_keyword_data,
-                columns=[
-                    "keyword",
-                    "original_keyword",
-                    "match_type",
-                    "campaign_name",
-                    "campaign_id",
-                    "adgroup_id",
-                    "adgroup_name",
-                    "account_id",
-                    "account_name",
-                ],
-            )
-            st.session_state["positive_keywords"] = positive_keyword_list
-
-    negative_kws = kw_helper.clean_and_dedup(negative_kws_report)
-    negative_keyword_list = pd.DataFrame(
-        [
-            (
-                kw.get_clean_keyword_text(),
-                kw.kw_text,
-                kw.match_type,
-                kw.campaign_name,
-                kw.campaign_id,
-                kw.adgroup_id,
-                kw.adgroup_name,
-                kw.account_id,
-                kw.account_name,
-            )
-            for keywords in negative_kws.values()
-            for kw in keywords
-        ],
-        columns=[
-            "keyword",
-            "original_keyword",
-            "match_type",
-            "campaign_name",
-            "campaign_id",
-            "adgroup_id",
-            "adgroup_name",
-            "account_id",
-            "account_name",
-        ],
+    positive_kws_report = kw_helper.get_positive_keywords(
+        clean_selected_customers
     )
-    return negative_keyword_list
+    if positive_kws_report:
+      positive_kws = kw_helper.clean_and_dedup(positive_kws_report)
+      positive_keyword_data = []
+      for keywords in positive_kws.values():
+        for kw in keywords:
+          positive_keyword_data.append((
+              kw.get_clean_keyword_text(),
+              kw.kw_text,
+              kw.match_type,
+              kw.campaign_name,
+              kw.campaign_id,
+              kw.adgroup_id,
+              kw.adgroup_name,
+              kw.account_id,
+              kw.account_name,
+          ))
+      positive_keyword_list = pd.DataFrame(
+          positive_keyword_data,
+          columns=[
+              "keyword",
+              "original_keyword",
+              "match_type",
+              "campaign_name",
+              "campaign_id",
+              "adgroup_id",
+              "adgroup_name",
+              "account_id",
+              "account_name",
+          ],
+      )
+
+  negative_kws = kw_helper.clean_and_dedup(negative_kws_report)
+  negative_keyword_data = []
+  for keywords in negative_kws.values():
+    for kw in keywords:
+      negative_keyword_data.append((
+          kw.get_clean_keyword_text(),
+          kw.kw_text,
+          kw.match_type,
+          kw.campaign_name,
+          kw.campaign_id,
+          kw.adgroup_id,
+          kw.adgroup_name,
+          kw.account_id,
+          kw.account_name,
+      ))
+  negative_keyword_list = pd.DataFrame(
+      negative_keyword_data,
+      columns=[
+          "keyword",
+          "original_keyword",
+          "match_type",
+          "campaign_name",
+          "campaign_id",
+          "adgroup_id",
+          "adgroup_name",
+          "account_id",
+          "account_name",
+      ],
+  )
+  return negative_keyword_list, positive_keyword_list
 
 
 def load_customers(customer_ids: list[str]) -> pd.DataFrame:
-    """Loads customer data for a given list of IDs.
+  """Loads customer data for a given list of IDs.
 
-    Results are cached per session so they are never shared with other users on
-    the same server instance.
+  Results are cached per session so they are never shared with other users on
+  the same server instance.
 
-    Args:
-      customer_ids: A list of customer ID strings to fetch.
+  Args:
+    customer_ids: A list of customer ID strings to fetch.
 
-    Returns:
-      A pandas DataFrame containing the customer data.
-    """
-    return _load_customers_cached(session_id(), customer_ids)
+  Returns:
+    A pandas DataFrame containing the customer data.
+  """
+  return _load_customers_cached(session_id(), customer_ids)
 
 
 @st.cache_data(ttl=_CACHE_TTL_SECONDS, show_spinner=False)
 def _load_customers_cached(
     session_key: str, customer_ids: list[str]
 ) -> pd.DataFrame:
-    """Fetches customer data; session_key scopes the cache to one session.
+  """Fetches customer data; session_key scopes the cache to one session.
 
-    Args:
-      session_key: The session identifier.
-      customer_ids: List of customer ID strings to fetch.
-    """
-    _ = session_key
-    try:
-        kw_helper = KeywordHelper(st.session_state.config)
-    except exceptions.GoogleAPIError as e:
-        st.error(f"Could not initialize the Google Ads client: {e}")
-        st.stop()
+  Args:
+    session_key: The session identifier.
+    customer_ids: List of customer ID strings to fetch.
+  """
+  _ = session_key
+  try:
+    kw_helper = KeywordHelper(st.session_state.config)
+  except exceptions.GoogleAPIError as e:
+    st.error(f"Could not initialize the Google Ads client: {e}")
+    st.stop()
 
-    if not kw_helper.report_fetcher:
-        st.error("An internal error occurred. Could not load KeywordHelper.")
-        return
+  if not kw_helper.report_fetcher:
+    st.error("An internal error occurred. Could not load KeywordHelper.")
+    return
 
-    with st.spinner(text="Loading customers under MCC, please wait..."):
-        customers_report = kw_helper.get_customers(customer_ids)
-        if not customers_report:
-            st.warning("No Customers found under MCC.")
-            st.stop()
+  with st.spinner(text="Loading customers under MCC, please wait..."):
+    customers_report = kw_helper.get_customers(customer_ids)
+    if not customers_report:
+      st.warning("No Customers found under MCC.")
+      st.stop()
 
-        all_customers = []
-        for customer in customers_report:
-            customer_obj = Customer(
-                customer.customer_client_id,
-                customer.customer_client_descriptive_name,
-            )
-            all_customers.append(customer_obj)
+    all_customers = []
+    for customer in customers_report:
+      customer_obj = Customer(
+          customer.customer_client_id,
+          customer.customer_client_descriptive_name,
+      )
+      all_customers.append(customer_obj)
 
-        customer_data = pd.DataFrame(
-            [(cust.customer_id, cust.customer_name) for cust in all_customers],
-            columns=["customer_id", "customer_name"],
-        )
+    customer_data = pd.DataFrame(
+        [(cust.customer_id, cust.customer_name) for cust in all_customers],
+        columns=["customer_id", "customer_name"],
+    )
 
-    return customer_data
+  return customer_data

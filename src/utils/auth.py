@@ -12,23 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Authentication utilities for Google OAuth2 in Streamlit."""
+
+import logging
 import os
-from typing import Any, Dict
+
+import dotenv
+import streamlit as st
+import utils.st_oauth as oauth
 
 try:
   # Loads local env variables.
-  import dotenv
-
   env_file = dotenv.find_dotenv()
-  print("Found .env file:", env_file)
+  logging.debug("Found .env file: %s", env_file)
   dotenv.load_dotenv(env_file)
-except ImportError as err:
-  print("ImportError:", err)
-except Exception as err:
-  print(f"Failed to import local env variables: {err}")
-
-import streamlit as st
-import utils.st_oauth as oauth
+except (ImportError, OSError, ValueError) as err:
+  logging.warning("Failed to import local env variables: %s", err)
 
 # Google OAuth2.0 configuration
 _AUTHORIZE_URL = os.getenv(
@@ -64,10 +63,11 @@ _GOOGLE_SIGN_IN_CODE = """
 </button>
 """
 
-print("OAUTH_REDIRECT_URI:", _OAUTH_REDIRECT_URI)
+logging.debug("OAUTH_REDIRECT_URI: %s", _OAUTH_REDIRECT_URI)
 
 
 def authenticate_user():
+  """Prompts the user to authenticate via Google OAuth2 in Streamlit."""
   oauth2_params = {
       "authorization_endpoint": _AUTHORIZE_URL,
       "token_endpoint": _TOKEN_URL,

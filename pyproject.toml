@@ -14,7 +14,6 @@ dependencies = [
     "tenacity",
     "langchain",
     "watchdog",
-    "openai",
     "pyyaml",
     "beautifulsoup4",
     "tiktoken",

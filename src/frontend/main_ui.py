@@ -38,7 +38,6 @@ from utils import llm_helper
 from utils.event_helper import session_state_manager
 import yaml
 
-logging.getLogger().setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 _SCHEMA_EVALUATIONS = {}
@@ -126,7 +125,7 @@ def _display_batch_accuracy(state_manager):
       / len(eval_pair)
       for eval_pair in epoch_eval_pairs
   ]
-  print("epoch_accuracies:", epoch_accuracies)
+  logger.debug("epoch_accuracies: %s", epoch_accuracies)
 
   # Display the accuracy metric and progress
   col1, col2 = st.columns(2)
@@ -160,6 +159,7 @@ def _display_batch_accuracy(state_manager):
 
 
 def _sample_and_score_keywords(state_manager):
+  """Samples a batch of keywords, scores them, and displays the results."""
   # Reset batch_completed at the start of a new batch
   state_manager.set("batch_completed", False)
 
@@ -202,6 +202,7 @@ def _sample_keywords(state_manager):
 
 
 def _score_keywords(state_manager):
+  """Scores the currently sampled batch of keywords using the LLM."""
   if state_manager.get("scored_keywords", None):
     return
 
@@ -285,6 +286,7 @@ def _score_keywords(state_manager):
 
 
 def _create_prompt():
+  """Creates the PromptTemplate for negative keyword evaluation."""
   template = textwrap.dedent("""\
             You are a machine learning model that analyzes negative keywords for Google Ads campaigns. For each provided negative keyword, determine if it should be KEPT (to prevent ads from showing for that search term) or REMOVED (to allow ads to show for searches containing that term). For each decision to KEEP or REMOVE, assign a priority_score to each decision where higher scores indicate keywords that should be addressed first based on the four factors examined for reason field. priority_score of 5 is the highest priority.
 
@@ -321,6 +323,7 @@ def _create_prompt():
 
 
 def _display_scored_keywords(state_manager):
+  """Displays the scored keywords for human feedback."""
   scored_keywords = state_manager.get("scored_keywords")
   parsed_scored_keywords = scored_keywords
   state_manager.set("parsed_scored_keywords", parsed_scored_keywords)
@@ -411,6 +414,7 @@ def _render_standard_card(
 
 
 def _split_and_display_keywords(state_manager):
+  """Splits scored keywords by decision and renders feedback cards."""
   # Retrieve necessary data from state_manager
   parsed_scored_keywords = state_manager.get("parsed_scored_keywords", [])
   keywords = state_manager.get("filtered_keywords")
@@ -481,6 +485,7 @@ def _score_remaining_keywords(state_manager):
 
 
 def _process_remaining_keywords(state_manager):
+  """Scores all remaining unevaluated keywords in batches."""
   scoring_progress_text = (
       "Your fine-tuned AI-Student is now scoring the remaining keywords... "
   )
@@ -491,6 +496,9 @@ def _process_remaining_keywords(state_manager):
   filtered_keywords = state_manager.get("filtered_keywords")
   positive_keywords = st.session_state.get("positive_keywords", pd.DataFrame())
   keywords_to_score = filtered_keywords
+  total_unique_kws = max(
+      keywords_to_score["keyword"].nunique() - len(scoring_seen_kws), 1
+  )
 
   while True:
     random_state = state_manager.get("random_state", models.get_random_state())
@@ -505,6 +513,7 @@ def _process_remaining_keywords(state_manager):
       st.markdown("Done ✅")
       break
 
+    scoring_seen_kws.update(keywords_batch["keyword"].tolist())
     pre_scored_keywords = []
     keywords_to_llm = []
 
@@ -563,25 +572,26 @@ def _process_remaining_keywords(state_manager):
     })
 
     if not scored_keywords_obj:
+      scoring_kws_evals.extend(pre_scored_keywords)
       continue
 
     llm_scored_keywords = [
         models.KeywordEvaluation(
             keyword=item.keyword,
-            decision=models.ScoreDecision(item.decision.upper()),
+            decision=models.ScoreDecision(item.decision),
             reason=item.reason,
+            priority_score=item.priority_score,
         )
         for item in scored_keywords_obj.evaluations
     ]
 
     all_scored_keywords = pre_scored_keywords + llm_scored_keywords
     scoring_kws_evals.extend(all_scored_keywords)
-    scoring_seen_kws.update(keywords_batch["keyword"].tolist())
 
     curr = len(scoring_kws_evals)
-    all_kws = len(keywords_to_score)
     scoring_bar.progress(
-        value=curr / all_kws, text=scoring_progress_text + f" {curr}/{all_kws}"
+        value=min(curr / total_unique_kws, 1.0),
+        text=scoring_progress_text + f" {curr}/{total_unique_kws}",
     )
 
   if scoring_kws_evals:
@@ -603,11 +613,12 @@ def _download_results(state_manager):
 
 
 def _prepare_and_display_downloads(state_manager):
+  """Prepares and renders download tables and buttons for scored keywords."""
   cached_scoring_kws_evals = state_manager.get("scoring_kws_evals")
   filtered_keywords = state_manager.get("filtered_keywords")
 
   # Prepare dataframes for removal and keeping
-  df_to_remove, df_to_keep = _prepare_dataframes(
+  df_to_remove, df_to_keep = models.prepare_dataframes(
       cached_scoring_kws_evals, filtered_keywords
   )
   st.session_state["df_to_remove_student"] = df_to_remove
@@ -675,44 +686,10 @@ def _prepare_human_dataframe(state_manager):
     A pandas DataFrame containing the human evaluations, or an empty DataFrame
     if no filtered keywords are available.
   """
-  # Retrieve filtered_keywords and evaluations from state_manager
-  filtered_keywords = state_manager.get("filtered_keywords", pd.DataFrame())
-  evaluations = state_manager.get("evaluations", {})
-
-  # Proceed only if filtered_keywords is not empty
-  if not filtered_keywords.empty:
-    formatted_evals = [
-        {
-            "keyword": kw,
-            "original_keyword": (
-                filtered_keywords.loc[
-                    filtered_keywords["keyword"] == kw, "original_keyword"
-                ].values[0]
-            ),
-            "human_decision": str(human_eval.decision),
-            "human_reason": human_eval.reason,
-            "campaign_name": (
-                filtered_keywords.loc[
-                    filtered_keywords["keyword"] == kw, "campaign_name"
-                ].values[0]
-            ),
-            "campaign_id": (
-                filtered_keywords.loc[
-                    filtered_keywords["keyword"] == kw, "campaign_id"
-                ].values[0]
-            ),
-            "adgroup_id": (
-                filtered_keywords.loc[
-                    filtered_keywords["keyword"] == kw, "adgroup_id"
-                ].values[0]
-            ),
-            "Source": "Human",
-        }
-        for kw, human_eval in evaluations.items()
-        if kw in filtered_keywords["keyword"].values
-    ]
-    return pd.DataFrame(formatted_evals)
-  return pd.DataFrame()
+  return models.prepare_human_dataframe(
+      state_manager.get("filtered_keywords", pd.DataFrame()),
+      state_manager.get("evaluations", {}),
+  )
 
 
 def _display_consolidated_download():
@@ -728,111 +705,6 @@ def _display_consolidated_download():
         df_consolidated.to_csv(index=False),
         file_name="consolidated_negative_keywords_to_remove.csv",
     )
-
-
-def _prepare_dataframes(cached_scoring_kws_evals, filtered_keywords):
-  """Prepares two DataFrames.
-
-    - df_to_remove: Keywords that the student suggests to remove from the
-  negative keyword list.
-    - df_to_keep: Keywords that the student suggests to keep in the negative
-  keyword list.
-
-  Args:
-    cached_scoring_kws_evals: List of student evaluations (student_eval
-      objects).
-    filtered_keywords: DataFrame containing the filtered keywords.
-
-  Returns:
-    df_to_remove: DataFrame of keywords to remove.
-    df_to_keep: DataFrame of keywords to keep.
-  """
-
-  # Helper function to fetch values from the DataFrame based on the keyword
-  def get_df_values(df, keyword, columns):
-    # Fetches values for specified columns based on the keyword
-    return {
-        col: df.loc[df["keyword"] == keyword, col].values[0] for col in columns
-    }
-
-  # Prepare the list of dictionaries for keywords to remove
-  formatted_evals_to_remove = [
-      {
-          "Account": df_entry.account_name,
-          "Campaign": df_entry.campaign_name,
-          "Ad Group": df_entry.adgroup_name,
-          "Keyword": student_eval.keyword,
-          "Criterion Type": (
-              ("Negative " if df_entry.adgroup_name else "Campaign Negative ")
-              + (
-                  "Broad"
-                  if df_entry.match_type == "BROAD"
-                  else "Phrase"
-                  if df_entry.match_type == "PHRASE"
-                  else "Exact"
-              )
-          ),
-          "Status": "Removed",
-          "Student Reason": student_eval.reason,
-          "Source": "Student",
-          "campaign_id": df_entry.campaign_id,
-          "adgroup_id": df_entry.adgroup_id,
-          "match_type": df_entry.match_type,
-          "Priority Score": student_eval.priority_score,
-      }
-      for student_eval in cached_scoring_kws_evals
-      if student_eval.decision == models.ScoreDecision.REMOVE
-      for df_entry in filtered_keywords.itertuples()
-      if df_entry.keyword == student_eval.keyword
-      and (df_entry.campaign_name or df_entry.adgroup_id)
-  ]
-
-  # Prepare the list of dictionaries for keywords to keep
-  formatted_evals_to_keep = [
-      {
-          "Account": df_entry.account_name,
-          "Campaign": df_entry.campaign_name,
-          "Ad Group": df_entry.adgroup_name,
-          "Keyword": student_eval.keyword,
-          "Criterion Type": (
-              ("Negative " if df_entry.adgroup_name else "Campaign Negative ")
-              + (
-                  "Broad"
-                  if df_entry.match_type == "BROAD"
-                  else "Phrase"
-                  if df_entry.match_type == "PHRASE"
-                  else "Exact"
-              )
-          ),
-          "Status": "Enabled",
-          "Student Reason": student_eval.reason,
-          "Source": "Student",
-          "Priority Score": student_eval.priority_score,
-          **get_df_values(
-              filtered_keywords,
-              student_eval.keyword,
-              ["original_keyword", "campaign_id", "adgroup_id", "account_id"],
-          ),
-      }
-      for student_eval in cached_scoring_kws_evals
-      if student_eval.decision == models.ScoreDecision.KEEP
-      for df_entry in filtered_keywords.itertuples()
-      if df_entry.keyword == student_eval.keyword
-      and (df_entry.campaign_name or df_entry.adgroup_id)
-  ]
-
-  # Convert the lists of dictionaries into DataFrames
-  df_to_remove = pd.DataFrame(formatted_evals_to_remove)
-  df_to_keep = pd.DataFrame(formatted_evals_to_keep)
-
-  if not df_to_remove.empty:
-    df_to_remove = df_to_remove.sort_values(
-        by=["Priority Score"], ascending=False
-    )
-  if not df_to_keep.empty:
-    df_to_keep = df_to_keep.sort_values(by=["Priority Score"], ascending=False)
-
-  return df_to_remove, df_to_keep
 
 
 def _handle_stop_training(state_manager):
